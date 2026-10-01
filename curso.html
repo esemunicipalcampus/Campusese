@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Curso · Contenido | ESE Municipal × Unillanos</title>
+<link rel="icon" href="assets/logos/logo-ese.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/estilos.css">
+</head>
+<body>
+
+<header class="encabezado" id="encabezado"></header>
+
+<main class="envoltura envoltura-ancha">
+
+  <section class="tarjeta">
+    <div class="curso-cabecera">
+      <div class="txt">
+        <h1>Contenido del curso</h1>
+        <p class="texto-suave" id="descCurso"></p>
+      </div>
+    </div>
+
+    <div class="barra-progreso">
+      <span id="barraProgreso"></span>
+    </div>
+    <div class="barra-texto">
+      <span id="textoProgreso">0 de 0 módulos leídos</span>
+    </div>
+
+    <div class="indice-modulos" id="indiceModulos"></div>
+
+    <div class="acciones-resultado mt-2">
+      <a href="evaluacion.html" class="btn btn-azul">Presentar evaluación</a>
+      <a href="certificado.html" class="btn btn-borde">Mi certificado</a>
+    </div>
+  </section>
+
+</main>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/preguntas.js"></script>
+<script src="assets/js/contenido.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+(function () {
+  "use strict";
+  const A = window.App;
+  const U = A.Sesion.leer();
+  if (!U) { location.replace("index.html?motivo=sesion"); return; }
+
+  const C = window.CONFIG;
+  const CUR = window.CURSO || {};
+  const modulos = (CUR.modulos || []).sort((a,b) => a.numero - b.numero);
+
+  document.getElementById("descCurso").textContent =
+    C.curso.subtitulo + ". Lee todos los módulos para reforzar los temas de la evaluación.";
+
+  function pintarIndice() {
+    const leidos = new Set(A.modulosLeidos(U.correo));
+    const lista = document.getElementById("indiceModulos");
+    if (modulos.length === 0) {
+      lista.innerHTML = '<div class="vacio">No hay módulos de contenido disponibles.</div>';
+      return;
+    }
+    lista.innerHTML = modulos.map(m => {
+      const l = leidos.has(m.numero);
+      const temas = m.temaId ? "" : "";
+      return `
+        <a class="modulo-tarjeta" href="modulo.html?n=${m.numero}">
+          <div class="num">MÓDULO ${m.numero}</div>
+          ${m.icono ? `<div class="icono">${A.esc(m.icono)}</div>` : ""}
+          <h3>${A.esc(m.titulo)}</h3>
+          ${m.subtitulo ? `<p>${A.esc(m.subtitulo)}</p>` : ""}
+          <div class="pie">
+            <span>${m.secciones ? m.secciones.length : 0} secciones</span>
+            ${l ? '<span class="pill-leido">Leído ✓</span>' : '<span>Marcar como leído al final</span>'}
+          </div>
+        </a>`;
+    }).join("");
+
+    const total = modulos.length;
+    const nL = leidos.size;
+    const pct = total === 0 ? 0 : Math.round((nL / total) * 100);
+    document.getElementById("barraProgreso").style.width = pct + "%";
+    document.getElementById("textoProgreso").textContent = `${nL} de ${total} módulos leídos (${pct}%)`;
+  }
+
+  pintarIndice();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Módulo · ESE Municipal × Unillanos</title>
+<link rel="icon" href="assets/logos/logo-ese.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/estilos.css">
+</head>
+<body>
+
+<header class="encabezado" id="encabezado"></header>
+
+<main class="envoltura">
+  <div id="contenidoModulo">Cargando módulo…</div>
+</main>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/contenido.js"></script>
+<script src="assets/js/preguntas.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+(function () {
+  "use strict";
+  const A = window.App;
+  const U = A.Sesion.leer();
+  if (!U) { location.replace("index.html?motivo=sesion"); return; }
+
+  const C = window.CONFIG;
+  const cont = document.getElementById("contenidoModulo");
+
+  const params = new URLSearchParams(location.search);
+  const n = parseInt(params.get("n") || "1", 10);
+  const mod = window.ContenidoCurso.porNumero(n);
+
+  if (!mod) {
+    cont.innerHTML = '<div class="tarjeta"><div class="vacio"><span class="icono">🔍</span>Módulo no encontrado. <a href="curso.html">Volver al índice</a></div></div>';
+    return;
+  }
+
+  document.title = `Módulo ${mod.numero} · ${mod.titulo} | ESE Municipal × Unillanos`;
+
+  /* ---- navegación anterior / siguiente ---- */
+  const todos = (window.CURSO.modulos || []).slice().sort((a,b)=>a.numero-b.numero);
+  const idx = todos.findIndex(m => m.numero === mod.numero);
+  const anterior = idx > 0 ? todos[idx-1] : null;
+  const siguiente = idx < todos.length-1 ? todos[idx+1] : null;
+
+  /* ---- render de secciones ---- */
+  function avisoHtml(a) {
+    if (!a) return "";
+    const iconos = { clave: "🔑", dato: "📌", alerta: "⚠️", excepcion: "⚡" };
+    return `<div class="aviso-${a.tipo}">
+      <strong>${iconos[a.tipo] || "•"} ${A.esc(a.titulo)}</strong>${A.esc(a.texto)}
+    </div>`;
+  }
+
+  function tablaHtml(t) {
+    if (!t) return "";
+    return `<div class="tabla-envoltura"><table class="datos">
+      <thead><tr>${t.columnas.map(c => `<th>${A.esc(c)}</th>`).join("")}</tr></thead>
+      <tbody>${t.filas.map(f => `<tr>${f.map(c => `<td>${A.esc(c)}</td>`).join("")}</tr>`).join("")}</tbody>
+    </table></div>`;
+  }
+
+  function listaHtml(items) {
+    return `<ul>${items.map(i => `<li>${A.esc(i)}</li>`).join("")}</ul>`;
+  }
+
+  function columnasHtml(cols) {
+    return `<div class="columnas">${cols.map(c => `
+      <div class="columna-caja">
+        <h4>${A.esc(c.titulo)}</h4>
+        ${listaHtml(c.items)}
+      </div>`).join("")}</div>`;
+  }
+
+  const seccionesHtml = mod.secciones.map(s => {
+    let h = `<section class="contenido-seccion">`;
+    // Algunas secciones solo llevan cita o nota: no se dibuja un título vacío.
+    if (s.titulo) h += `<h2>${A.esc(s.titulo)}</h2>`;
+    if (s.subtituloRelacion) h += `<h3>${A.esc(s.subtituloRelacion)}</h3>`;
+    if (s.cita) h += `<div class="cita">${A.esc(s.cita)}</div>`;
+    if (s.parrafos) h += s.parrafos.map(p => `<p>${A.esc(p)}</p>`).join("");
+    if (s.lista) h += listaHtml(s.lista);
+    h += tablaHtml(s.tabla);
+    if (s.columnas) h += columnasHtml(s.columnas);
+    h += avisoHtml(s.aviso);
+    if (s.nota) h += `<div class="nota">${A.esc(s.nota)}</div>`;
+    h += `</section>`;
+    return h;
+  }).join("");
+
+  /* ---- botón de tema asociado ---- */
+  const tema = window.BancoPreguntas ? window.TEMAS.find(t => t.id === mod.temaId) : null;
+  const preguntasTema = tema ? tema.preguntas.length : 0;
+
+  cont.innerHTML = `
+    <section class="leedor-cabecera">
+      <div class="fila-top">
+        <span class="etiqueta">Módulo ${mod.numero} de ${todos.length}</span>
+        ${mod.icono ? `<span style="font-size:1.4rem">${A.esc(mod.icono)}</span>` : ""}
+      </div>
+      <h1>${A.esc(mod.titulo)}</h1>
+      ${mod.subtitulo ? `<p class="texto-suave" style="margin:0">${A.esc(mod.subtitulo)}</p>` : ""}
+      ${mod.fuente ? `<p class="fuente">Fuente: ${A.esc(mod.fuente)}</p>` : ""}
+    </section>
+
+    <div class="tarjeta">
+      ${seccionesHtml}
+
+      ${tema ? `
+      <div class="aviso aviso-clave mt-2">
+        <strong>Este módulo se evalúa en el tema ${tema.numero}: ${A.esc(tema.titulo)}</strong>
+        En la evaluación encontrarás ${preguntasTema} preguntas relacionadas con este contenido.
+      </div>` : ""}
+
+      <div class="navegacion-modulos">
+        ${anterior
+          ? `<a class="btn btn-borde" href="modulo.html?n=${anterior.numero}">← ${A.esc(anterior.titulo)}</a>`
+          : `<a class="btn btn-borde" href="curso.html">← Volver al índice</a>`}
+        ${siguiente
+          ? `<a class="btn" href="modulo.html?n=${siguiente.numero}">${A.esc(siguiente.titulo)} →</a>`
+          : `<a class="btn btn-azul" href="evaluacion.html">Ir a la evaluación →</a>`}
+      </div>
+    </div>
+
+    <div class="acciones-resultado">
+      <button type="button" class="btn btn-azul" id="btnMarcarLeido">Marcar módulo como leído</button>
+      <a class="btn btn-borde" href="curso.html">Volver al índice</a>
+    </div>`;
+
+  /* marcar como leído */
+  document.getElementById("btnMarcarLeido").addEventListener("click", () => {
+    A.marcarModuloLeido(U.correo, mod.numero);
+    alert("Módulo " + mod.numero + " marcado como leído.");
+  });
+})();
+</script>
+</body>
+</html>

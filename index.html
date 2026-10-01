@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capacitación en Protocolos de Urgencias | ESE Municipal de Villavicencio × Unillanos</title>
+<meta name="description" content="Curso virtual de actualización en Código Azul, RCP, carro de paro, ronda de seguridad y entrega de turno para el personal de la ESE Municipal de Villavicencio.">
+<link rel="icon" href="assets/logos/logo-ese.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/estilos.css">
+</head>
+<body>
+
+<header class="encabezado" id="encabezado"></header>
+
+<main class="envoltura">
+
+  <!-- ===================== PORTADA ===================== -->
+  <section class="portada">
+    <div class="portada-doble">
+      <img src="assets/logos/logo-ese.svg" alt="Logo ESE Municipal de Villavicencio">
+      <div class="sep" aria-hidden="true"></div>
+      <img src="assets/logos/logo-unillanos.svg" alt="Logo Universidad de los Llanos">
+    </div>
+
+    <h1>Capacitación en Protocolos de Urgencias</h1>
+    <p class="subtitulo" id="subtituloPortada"></p>
+
+    <div class="etiquetas" id="etiquetasPortada"></div>
+
+    <div class="datos-curso" id="datosCurso"></div>
+  </section>
+
+  <!-- ===================== ACCESO / REGISTRO ===================== -->
+  <section class="acceso" id="acceso"></section>
+
+</main>
+
+<footer class="no-imprimir" style="text-align:center;padding:1.5rem 1rem 2.5rem;color:var(--texto-suave);font-size:.82rem;border-top:1px solid var(--borde)">
+  <strong>ESE Municipal de Villavicencio</strong> · Empresa Social del Estado del Municipio de Villavicencio<br>
+  Universidad de los Llanos · Ruralito Unillanos
+</footer>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/preguntas.js"></script>
+<script src="assets/js/contenido.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+/* ---------------------------------------------------------------------------
+   Portada + acceso con Google + formulario de registro
+   ------------------------------------------------------------------------- */
+(function () {
+  "use strict";
+
+  const C = window.CONFIG;
+  const A = window.App;
+
+  /* ---------- textos de portada ---------- */
+  document.getElementById("subtituloPortada").textContent = C.curso.subtitulo;
+
+  document.getElementById("etiquetasPortada").innerHTML = [
+    C.entidadSalud.sigla,
+    C.entidadAcademica.sigla,
+    C.entidadSalud.centro,
+    "Certificación digital",
+  ].map(t => `<span class="etiqueta">${A.esc(t)}</span>`).join("");
+
+  const nTemas = window.TEMAS ? window.TEMAS.length : 0;
+  const nModulos = window.CURSO ? window.CURSO.modulos.length : 0;
+  const nPreguntas = window.BancoPreguntas ? window.BancoPreguntas.total() : 0;
+
+  document.getElementById("datosCurso").innerHTML = [
+    ["2", "Protocolos críticos"],
+    [nModulos, "Módulos de estudio"],
+    [nTemas, "Temas de evaluación"],
+    [nPreguntas, "Preguntas"],
+    [C.curso.duracion, "Duración"],
+    [C.curso.notaAprobacion + "%", "Nota de aprobación"],
+  ].map(([v, t]) => `<div class="dato"><strong>${A.esc(v)}</strong><span>${A.esc(t)}</span></div>`).join("");
+
+  /* ---------- formulario de registro ---------- */
+  const CARGOS = [
+    "Médico general", "Médico especialista", "Enfermera profesional", "Enfermera ",
+    "Auxiliar de enfermería", "Regente de farmacia", "Auxiliar de farmacia",
+    "Líder de proceso", "Coordinador(a)", "Otro",
+  ];
+
+  const CAMPOS = [
+    { id: "nombre", etiqueta: "Nombre completo *", tipo: "text", req: true, ancho: "completo" },
+    { id: "documento", etiqueta: "Número de documento *", tipo: "text", req: true, ancho: "medio" },
+    { id: "cargo", etiqueta: "Cargo o especialidad *", tipo: "select", req: true, ancho: "medio", opciones: CARGOS },
+    { id: "servicio", etiqueta: "Servicio o área *", tipo: "text", req: true, ancho: "medio" },
+    { id: "centro", etiqueta: "Centro de salud *", tipo: "text", req: true, ancho: "medio" },
+    { id: "telefono", etiqueta: "Teléfono de contacto", tipo: "tel", req: false, ancho: "medio" },
+    { id: "profesional", etiqueta: "¿Es usted profesional de la salud?", tipo: "select", req: false, ancho: "medio",
+      opciones: ["Sí", "No"] },
+  ];
+
+  function pintarFormulario(correo) {
+    const previo = A.leerRegistro(correo) || {};
+
+    const camposHtml = CAMPOS.map(c => {
+      const v = A.esc(previo[c.id] || "");
+      let control;
+      if (c.tipo === "select") {
+        control =
+          `<select id="f_${c.id}" name="${c.id}">` +
+          `<option value="">Seleccione…</option>` +
+          c.opciones.map(o => `<option value="${A.esc(o)}" ${previo[c.id] === o ? "selected" : ""}>${A.esc(o)}</option>`).join("") +
+          `</select>`;
+      } else {
+        control = `<input type="${c.tipo}" id="f_${c.id}" name="${c.id}" value="${v}" ${c.req ? "required" : ""}>`;
+      }
+      const col = c.ancho === "medio" ? "medio" : "";
+      return `<div class="campo ${col}" data-campo="${c.id}">
+        <label for="f_${c.id}">${A.esc(c.etiqueta)}</label>
+        ${control}
+        <div class="error">Este campo es obligatorio.</div>
+      </div>`;
+    }).join("");
+
+    return `
+      <form id="formRegistro" novalidate>
+        <div class="grilla-campos">
+          <div class="campo completo">
+            <label for="f_correo">Correo de registro (Google)</label>
+            <input type="email" id="f_correo" value="${A.esc(correo)}" readonly>
+            <div class="ayuda">Este correo se usará para emitir el certificado y no se puede modificar.</div>
+          </div>
+          ${camposHtml}
+        </div>
+        <div class="aviso aviso-info" style="margin-top:.4rem">
+          <strong>Nota sobre el uso de datos</strong>
+          Sus datos se usan exclusivamente para registrar la asistencia, emitir el certificado
+          y soportar el proceso de verificación institucional.
+        </div>
+        <button type="submit" class="btn btn-bloque">Guardar registro y continuar</button>
+      </form>`;
+  }
+
+  function pintarAcceso() {
+    const usuario = A.Sesion.leer();
+    const cont = document.getElementById("acceso");
+
+    if (!usuario) {
+      cont.innerHTML = `
+        <div class="tarjeta acceso-caja">
+          <h2>Ingreso al curso</h2>
+          <p class="texto-suave">
+            El acceso es exclusivamente con tu cuenta de Google. Esta misma cuenta
+            quedará registrada como tu correo institucional para la emisión del certificado.
+          </p>
+          <div class="g-boton" id="zonaBotonGoogle"></div>
+          <div class="pasos">
+            <li>Ingresa con tu cuenta de Google.</li>
+            <li>Completa tus datos institucionales.</li>
+            <li>Estudia los 9 módulos del curso.</li>
+            <li>Presenta la evaluación y descarga tu certificado.</li>
+          </div>
+        </div>`;
+      A.Sesion.montarBoton(document.getElementById("zonaBotonGoogle"), () => pintarAcceso());
+      return;
+    }
+
+    const registrado = A.estaRegistrado(usuario.correo);
+
+    cont.innerHTML = `
+      <div class="tarjeta">
+        <div class="caja-usuario">
+          ${usuario.foto ? `<img src="${A.esc(usuario.foto)}" alt="" referrerpolicy="no-referrer">` : ""}
+          <div>
+            <strong>Sesión iniciada como ${A.esc(usuario.nombre)}</strong>
+            <span>${A.esc(usuario.correo)}${usuario.emailVerified === false ? " · correo no verificado" : ""}</span>
+          </div>
+        </div>
+
+        <h2 style="margin-top:1.3rem">
+          ${registrado ? "Tus datos registrados" : "Registro de participante"}
+        </h2>
+        <p class="texto-suave texto-peq">
+          ${registrado
+            ? "Puedes actualizar tus datos si cambiaron de cargo o servicio."
+            : "Completa los siguientes datos para aparecer en el registro oficial del curso y en tu certificado."}
+        </p>
+
+        ${pintarFormulario(usuario.correo)}
+
+        <div class="acciones-resultado">
+          <a href="curso.html" class="btn btn-azul">Ir al curso</a>
+          <a href="evaluacion.html" class="btn btn-borde">Ir a la evaluación</a>
+        </div>
+      </div>`;
+
+    const form = document.getElementById("formRegistro");
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
+
+      let ok = true;
+      for (const c of CAMPOS) {
+        const input = document.getElementById("f_" + c.id);
+        const cont2 = form.querySelector('[data-campo="' + c.id + '"]');
+        const vacio = !input.value.trim();
+        cont2.classList.toggle("campo-error", !!c.req && vacio);
+        if (c.req && vacio) ok = false;
+      }
+      if (!ok) {
+        btn.disabled = false;
+        alert("Completa todos los campos obligatorios (marcados con *).");
+        return;
+      }
+
+      const datos = { correo: usuario.correo };
+      for (const c of CAMPOS) datos[c.id] = document.getElementById("f_" + c.id).value.trim();
+
+      datos.googleNombre = usuario.nombre;
+      datos.registro = new Date().toISOString();
+
+      A.guardarRegistro(usuario.correo, datos);
+      const remoto = await A.Remoto.registrarParticipante(datos);
+
+      btn.disabled = false;
+      if (remoto && remoto.ok === false && remoto.motivo !== "deshabilitado") {
+        alert("Se guardó en este navegador, pero no se pudo enviar al registro central.\n\n" +
+              "Motivo: " + (remoto.motivo || remoto.bruto || "desconocido"));
+      }
+
+      alert("Registro guardado correctamente.\n\nCorreo registrado: " + usuario.correo);
+      location.href = "curso.html";
+    });
+  }
+
+  pintarAcceso();
+})();
+</script>
+</body>
+</html>
