@@ -20,24 +20,9 @@
     <div class="portada-cuerpo">
       <p class="portada-sello">ESE Municipal de Villavicencio</p>
       <h1 id="tituloPortada">Campus Virtual ESE Municipal</h1>
-      <p class="subtitulo" id="subtituloPortada"></p>
-      <p class="portada-bajada">
-        Capacitación en los cuatro protocolos de seguridad del paciente.
-        Lee cada módulo, marca las secciones y presenta la evaluación de cada uno.
-      </p>
-
-      <div class="portada-chips">
-        <a class="chip-protocolo chip-1" href="protocolos.html">Código Azul</a>
-        <a class="chip-protocolo chip-2" href="protocolos.html">Carro de Paro</a>
-        <a class="chip-protocolo chip-3" href="protocolos.html">Ronda de Seguridad</a>
-        <a class="chip-protocolo chip-4" href="protocolos.html">Entrega de Turno</a>
-      </div>
 
       <div class="portada-acciones">
-        <a href="protocolos.html" class="btn btn-claro">Comenzar la capacitación</a>
-        <a href="admin.html" class="btn btn-coordinacion">
-          <span class="ico">🔐</span> Entrar al panel administrativo
-        </a>
+        <a href="admin.html" class="btn btn-coordinacion">Entrar al panel administrativo</a>
       </div>
     </div>
   </section>
@@ -66,9 +51,6 @@
 
   const C = window.CONFIG;
   const A = window.App;
-
-  /* ---------- textos de portada ---------- */
-  document.getElementById("subtituloPortada").textContent = C.programa.subtitulo;
 
   /* ---------- ficha mínima: sede y cargo ----------
      El nombre y el correo YA VINIERON de Google: no se vuelven a pedir.
