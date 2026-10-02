@@ -416,7 +416,7 @@
         try { return JSON.parse(texto); } catch (e) { return { ok: res.ok, bruto: texto }; }
       } catch (e) {
         console.warn("Remoto.enviar error", e);
-        return { ok: false, motivo: String(e) };
+        return { ok: false, motivo: "sin-red" };
       }
     },
 

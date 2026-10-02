@@ -70,12 +70,32 @@
       btn.textContent = "Entrar";
 
       if (!r || r.ok !== true || !r.token) {
-        A.aviso(r && r.mensaje ? r.mensaje : "Contraseña incorrecta.", "error");
+        A.aviso(motivoDeFallo(r), "error", 9000);
         return;
       }
       guardarToken(r.token);
       cargar();
     });
+  }
+
+  /* Explica por qué no se pudo entrar. Antes decía "Contraseña incorrecta"
+     aunque el servidor ni siquiera estaba configurado, y eso hacía pensar
+     que la contraseña estaba mal cuando el problema era otro. */
+  function motivoDeFallo(r) {
+    if (r && r.motivo === "deshabilitado") {
+      return "El registro central no está conectado, así que no se puede verificar "
+        + "ninguna contraseña. En assets/js/config.js faltan almacenamiento: \"sheet\" "
+        + "y appsScriptUrl. La contraseña 130004708 es la del backend: solo empieza "
+        + "a funcionar cuando el Apps Script esté desplegado.";
+    }
+    if (r && r.motivo === "sin-red") {
+      return "No hubo respuesta del servidor. Revisa tu conexión o el despliegue del Apps Script.";
+    }
+    if (r && r.motivo) {
+      return "El servidor respondió: " + (r.mensaje || r.motivo);
+    }
+    if (r && r.mensaje) return r.mensaje;
+    return "No se pudo verificar la contraseña.";
   }
 
   /* ------------------------------------------------------------------ */
