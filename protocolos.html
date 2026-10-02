@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Protocolos · ESE Municipal × Unillanos</title>
+<link rel="icon" href="assets/logos/eselogo.jpg">
+<link rel="stylesheet" href="assets/css/estilos.css">
+</head>
+<body>
+
+<header class="encabezado" id="encabezado"></header>
+
+<main class="envoltura envoltura-ancha">
+
+  <section class="tarjeta">
+    <div class="curso-cabecera">
+      <div class="txt">
+        <h1>Protocolos de Seguridad del Paciente</h1>
+        <p class="texto-suave" id="descripcion"></p>
+      </div>
+    </div>
+
+    <div class="barra-progreso">
+      <span id="barraProgreso"></span>
+    </div>
+    <div class="barra-texto">
+      <span id="textoProgreso">0 de 0 protocolos completados</span>
+    </div>
+  </section>
+
+  <div class="protocolo-grid" id="listaProtocolos"></div>
+
+</main>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/preguntas.js"></script>
+<script src="assets/js/contenido.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+(function () {
+  "use strict";
+  const A = window.App;
+  const U = A.exigirRegistro();
+  if (!U) return;
+
+  const C = window.CONFIG;
+  const CUR = window.CURSO || {};
+  const modulos = CUR.modulos || [];
+  const lista = document.getElementById("listaProtocolos");
+
+  document.getElementById("descripcion").textContent =
+    C.programa.descripcion;
+
+  function estado(p) {
+    if (A.aproboProtocolo(U.correo, p.id)) return "aprobado";
+    const usados = A.intentosProtocolo(U.correo, p.id);
+    if (usados === 0) return "pendiente";
+    if (usados >= C.programa.intentosMaximos) return "agotado";
+    return "en-curso";
+  }
+
+  function pintar() {
+    const prots = A.protocolos();
+    if (!prots.length) {
+      lista.innerHTML = '<div class="vacio">No hay protocolos configurados.</div>';
+      return;
+    }
+
+    lista.innerHTML = prots.map(function (p) {
+      const est = estado(p);
+      const usados = A.intentosProtocolo(U.correo, p.id);
+      const total = A.totalPreguntasProtocolo(p.id);
+      const mods = modulos.filter(function (m) {
+        return (p.modulos || []).includes(m.numero);
+      });
+      const leidos = new Set(A.modulosLeidos(U.correo));
+
+      const insignia = {
+        aprobado: '<span class="pill-est pill-ok">Aprobado ✓</span>',
+        "en-curso": '<span class="pill-est pill-avanzando">En curso</span>',
+        agotado: '<span class="pill-est pill-mal">Intentos agotados</span>',
+        pendiente: '<span class="pill-est pill-neutro">Sin iniciar</span>',
+      }[est];
+
+      const bloqueEval = est === "aprobado"
+        ? '<a class="btn btn-azul" href="certificado.html?p=' + encodeURIComponent(p.id) + '">Ver reconocimiento</a>'
+        : est === "agotado"
+          ? '<a class="btn btn-borde" href="resultado.html?p=' + encodeURIComponent(p.id) + '">Ver intentos</a>'
+          : '<a class="btn btn-azul" href="evaluacion.html?p=' + encodeURIComponent(p.id) + '">Presentar evaluación</a>';
+
+      const nMods = (p.modulos || []).length;
+      return ''
+      + '<article class="protocolo-tarjeta" style="--color-protocolo:' + p.color + '">'
+      + '  <div class="pt-cabecera">'
+      + '    <div class="pt-icono">' + p.icono + '</div>'
+      + '    <div>'
+      + '      <div class="pt-num">PROTOCOLO ' + p.numero + '</div>'
+      + '      <h2>' + A.esc(p.nombre) + '</h2>'
+      + '      <p class="pt-sub">' + A.esc(p.subtitulo) + '</p>'
+      + '    </div>'
+      + '    ' + insignia
+      + '  </div>'
+      + '  <p class="pt-desc">' + A.esc(p.descripcion) + '</p>'
+      + '  <ul class="pt-modulos">'
+      +    mods.map(function (m) {
+             return '<li class="' + (leidos.has(m.numero) ? "leido" : "") + '">'
+               + '<a href="modulo.html?n=' + m.numero + '&p=' + encodeURIComponent(p.id) + '">'
+               + '<span>' + A.esc(m.titulo) + '</span>'
+               + (leidos.has(m.numero) ? '<em>✓ leído</em>' : '<em>' + (m.secciones ? m.secciones.length : 0) + ' secciones</em>')
+               + '</a></li>';
+           }).join("")
+      + '  </ul>'
+      +      (p.pdf
+        ? '  <a class="pt-pdf" href="' + A.esc(p.pdf) + '" target="_blank" rel="noopener">'
+          + '<span aria-hidden="true">📄</span> Ver el procedimiento completo (PDF) — si quieres consultarlo</a>'
+        : '')
+      + '  <div class="pt-datos">'
+      + '    <span><b>' + nMods + '</b> ' + (nMods === 1 ? 'módulo' : 'módulos') + '</span>'
+      + '    <span><b>' + total + '</b> ' + (total === 1 ? 'pregunta' : 'preguntas') + '</span>'
+      + '    <span><b>' + p.horas + '</b> h</span>'
+      + '    <span><b>' + usados + '</b>/' + C.programa.intentosMaximos + ' intentos</span>'
+      + '  </div>'
+      + '  <div class="pt-acciones">' + bloqueEval
+      + '    <a class="btn btn-borde" href="resultado.html?p=' + encodeURIComponent(p.id) + '">Resultado</a>'
+      + '  </div>'
+      + '</article>';
+    }).join("");
+
+    const completos = prots.filter(function (p) {
+      return A.aproboProtocolo(U.correo, p.id);
+    }).length;
+    const pct = prots.length === 0 ? 0
+      : Math.round((completos / prots.length) * 100);
+
+    document.getElementById("barraProgreso").style.width = pct + "%";
+    document.getElementById("textoProgreso").textContent =
+      completos + " de " + prots.length + " protocolos aprobados (" + pct + "%)";
+  }
+
+  pintar();
+})();
+</script>
+</body>
+</html>

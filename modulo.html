@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Módulo · ESE Municipal × Unillanos</title>
-<link rel="icon" href="assets/logos/logo-ese.svg" type="image/svg+xml">
+<link rel="icon" href="assets/logos/eselogo.jpg">
 <link rel="stylesheet" href="assets/css/estilos.css">
 </head>
 <body>
@@ -23,8 +23,8 @@
 (function () {
   "use strict";
   const A = window.App;
-  const U = A.Sesion.leer();
-  if (!U) { location.replace("index.html?motivo=sesion"); return; }
+  const U = A.exigirRegistro();
+  if (!U) return;
 
   const C = window.CONFIG;
   const cont = document.getElementById("contenidoModulo");
@@ -34,17 +34,25 @@
   const mod = window.ContenidoCurso.porNumero(n);
 
   if (!mod) {
-    cont.innerHTML = '<div class="tarjeta"><div class="vacio"><span class="icono">🔍</span>Módulo no encontrado. <a href="curso.html">Volver al índice</a></div></div>';
+    cont.innerHTML = '<div class="tarjeta"><div class="vacio"><span class="icono">🔍</span>Módulo no encontrado. <a href="protocolos.html">Volver a los protocolos</a></div></div>';
     return;
   }
 
+  /* ---- protocolo al que pertenece este módulo ---- */
+  const protocoloModulo = A.protocolo(mod.protocolo || params.get("p") || "");
+  if (protocoloModulo) sessionStorage.setItem("ese_protocolo", protocoloModulo.id);
+
   document.title = `Módulo ${mod.numero} · ${mod.titulo} | ESE Municipal × Unillanos`;
 
-  /* ---- navegación anterior / siguiente ---- */
-  const todos = (window.CURSO.modulos || []).slice().sort((a,b)=>a.numero-b.numero);
+  /* ---- navegación anterior / siguiente dentro del mismo protocolo ---- */
+  const todos = (window.CURSO.modulos || [])
+    .filter(m => !protocoloModulo || (protocoloModulo.modulos || []).includes(m.numero))
+    .slice()
+    .sort((a, b) => a.numero - b.numero);
   const idx = todos.findIndex(m => m.numero === mod.numero);
-  const anterior = idx > 0 ? todos[idx-1] : null;
-  const siguiente = idx < todos.length-1 ? todos[idx+1] : null;
+  const anterior = idx > 0 ? todos[idx - 1] : null;
+  const siguiente = idx < todos.length - 1 ? todos[idx + 1] : null;
+  const sufijoP = protocoloModulo ? "&p=" + encodeURIComponent(protocoloModulo.id) : "";
 
   /* ---- render de secciones ---- */
   function avisoHtml(a) {
@@ -91,14 +99,22 @@
     return h;
   }).join("");
 
-  /* ---- botón de tema asociado ---- */
+  /* ---- tema y procedimiento asociado ---- */
   const tema = window.BancoPreguntas ? window.TEMAS.find(t => t.id === mod.temaId) : null;
-  const preguntasTema = tema ? tema.preguntas.length : 0;
+  const totalProtocolo = A.totalPreguntasProtocolo(protocoloModulo ? protocoloModulo.id : "");
 
   cont.innerHTML = `
     <section class="leedor-cabecera">
+      ${protocoloModulo ? `
+      <a class="miga" href="protocolos.html">← Protocolos</a>
+      <div class="pt-barra" style="--color-protocolo:${protocoloModulo.color}">
+        ${protocoloModulo.icono} Protocolo ${protocoloModulo.numero}: ${A.esc(protocoloModulo.nombre)}
+        ${protocoloModulo.pdf
+          ? `<a class="pt-pdf-inline" href="${A.esc(protocoloModulo.pdf)}" target="_blank" rel="noopener">📄 Ver el procedimiento (PDF) — si quieres consultarlo</a>`
+          : ""}
+      </div>` : ""}
       <div class="fila-top">
-        <span class="etiqueta">Módulo ${mod.numero} de ${todos.length}</span>
+        <span class="etiqueta">Módulo ${mod.numero} de ${window.CURSO.modulos.length}</span>
         ${mod.icono ? `<span style="font-size:1.4rem">${A.esc(mod.icono)}</span>` : ""}
       </div>
       <h1>${A.esc(mod.titulo)}</h1>
@@ -111,30 +127,47 @@
 
       ${tema ? `
       <div class="aviso aviso-clave mt-2">
-        <strong>Este módulo se evalúa en el tema ${tema.numero}: ${A.esc(tema.titulo)}</strong>
-        En la evaluación encontrarás ${preguntasTema} preguntas relacionadas con este contenido.
+        <strong>Este módulo se evalúa en el tema "${A.esc(tema.titulo)}"</strong>
+        En la evaluación de este protocolo encontrarás ${totalProtocolo} preguntas que cubren este contenido.
       </div>` : ""}
 
       <div class="navegacion-modulos">
         ${anterior
-          ? `<a class="btn btn-borde" href="modulo.html?n=${anterior.numero}">← ${A.esc(anterior.titulo)}</a>`
-          : `<a class="btn btn-borde" href="curso.html">← Volver al índice</a>`}
+          ? `<a class="btn btn-borde" href="modulo.html?n=${anterior.numero}${sufijoP}">← ${A.esc(anterior.titulo)}</a>`
+          : `<a class="btn btn-borde" href="protocolos.html">← Volver a los protocolos</a>`}
         ${siguiente
-          ? `<a class="btn" href="modulo.html?n=${siguiente.numero}">${A.esc(siguiente.titulo)} →</a>`
-          : `<a class="btn btn-azul" href="evaluacion.html">Ir a la evaluación →</a>`}
+          ? `<a class="btn" href="modulo.html?n=${siguiente.numero}${sufijoP}">${A.esc(siguiente.titulo)} →</a>`
+          : (protocoloModulo
+              ? `<a class="btn btn-azul" href="evaluacion.html?p=${encodeURIComponent(protocoloModulo.id)}">Ir a la evaluación →</a>`
+              : `<a class="btn btn-azul" href="protocolos.html">Ir a los protocolos →</a>`)}
       </div>
     </div>
 
     <div class="acciones-resultado">
       <button type="button" class="btn btn-azul" id="btnMarcarLeido">Marcar módulo como leído</button>
-      <a class="btn btn-borde" href="curso.html">Volver al índice</a>
+      ${protocoloModulo
+        ? `<a class="btn btn-borde" href="evaluacion.html?p=${encodeURIComponent(protocoloModulo.id)}">Evaluar este protocolo</a>`
+        : ""}
+      <a class="btn btn-borde" href="protocolos.html">Volver a los protocolos</a>
     </div>`;
 
-  /* marcar como leído */
-  document.getElementById("btnMarcarLeido").addEventListener("click", () => {
+  /* Marcar como leído: avisa con una pestaña y no interrumpe la lectura. */
+  const btnLeido = document.getElementById("btnMarcarLeido");
+
+  function reflejarLeido() {
+    if (!A.modulosLeidos(U.correo).includes(mod.numero)) return;
+    btnLeido.disabled = true;
+    btnLeido.textContent = "✓ Módulo leído";
+    btnLeido.classList.add("btn-ok");
+  }
+
+  btnLeido.addEventListener("click", () => {
     A.marcarModuloLeido(U.correo, mod.numero);
-    alert("Módulo " + mod.numero + " marcado como leído.");
+    reflejarLeido();
+    A.aviso(`Módulo ${mod.numero} marcado como leído ✓`, "ok");
   });
+
+  reflejarLeido();
 })();
 </script>
 </body>

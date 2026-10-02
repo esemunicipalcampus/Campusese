@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Capacitación en Protocolos de Urgencias | ESE Municipal de Villavicencio × Unillanos</title>
-<meta name="description" content="Curso virtual de actualización en Código Azul, RCP, carro de paro, ronda de seguridad y entrega de turno para el personal de la ESE Municipal de Villavicencio.">
-<link rel="icon" href="assets/logos/logo-ese.svg" type="image/svg+xml">
+<title>Protocolos de Seguridad del Paciente | ESE Municipal de Villavicencio × Unillanos</title>
+<meta name="description" content="Capacitación virtual en Código Azul, RCP, carro de paro, ronda de seguridad y entrega de turno para el personal de la ESE Municipal de Villavicencio.">
+<link rel="icon" href="assets/logos/eselogo.jpg">
 <link rel="stylesheet" href="assets/css/estilos.css">
 </head>
 <body>
@@ -17,12 +17,12 @@
   <!-- ===================== PORTADA ===================== -->
   <section class="portada">
     <div class="portada-doble">
-      <img src="assets/logos/logo-ese.svg" alt="Logo ESE Municipal de Villavicencio">
+      <img class="logo-ese" src="assets/logos/eselogo.jpg" alt="Logo ESE Municipal de Villavicencio">
       <div class="sep" aria-hidden="true"></div>
-      <img src="assets/logos/logo-unillanos.svg" alt="Logo Universidad de los Llanos">
+      <img class="logo-unillanos" src="assets/logos/Logo_unillanos1.png" alt="Logo Universidad de los Llanos">
     </div>
 
-    <h1>Capacitación en Protocolos de Urgencias</h1>
+    <h1>Protocolos de Seguridad del Paciente</h1>
     <p class="subtitulo" id="subtituloPortada"></p>
 
     <div class="etiquetas" id="etiquetasPortada"></div>
@@ -55,85 +55,59 @@
   const A = window.App;
 
   /* ---------- textos de portada ---------- */
-  document.getElementById("subtituloPortada").textContent = C.curso.subtitulo;
+  document.getElementById("subtituloPortada").textContent = C.programa.subtitulo;
 
   document.getElementById("etiquetasPortada").innerHTML = [
     C.entidadSalud.sigla,
     C.entidadAcademica.sigla,
-    C.entidadSalud.centro,
-    "Certificación digital",
+    ...(C.sedes || []),
+    "Reconocimiento verificable",
   ].map(t => `<span class="etiqueta">${A.esc(t)}</span>`).join("");
 
+  const prots = A.protocolos();
   const nTemas = window.TEMAS ? window.TEMAS.length : 0;
   const nModulos = window.CURSO ? window.CURSO.modulos.length : 0;
   const nPreguntas = window.BancoPreguntas ? window.BancoPreguntas.total() : 0;
+  const horasTotal = prots.reduce((s, p) => s + Number(p.horas || 0), 0);
 
   document.getElementById("datosCurso").innerHTML = [
-    ["2", "Protocolos críticos"],
+    [prots.length, "Protocolos"],
     [nModulos, "Módulos de estudio"],
     [nTemas, "Temas de evaluación"],
     [nPreguntas, "Preguntas"],
-    [C.curso.duracion, "Duración"],
-    [C.curso.notaAprobacion + "%", "Nota de aprobación"],
+    [horasTotal + " h", "Duración total"],
+    [C.programa.notaAprobacion + "%", "Nota de aprobación"],
   ].map(([v, t]) => `<div class="dato"><strong>${A.esc(v)}</strong><span>${A.esc(t)}</span></div>`).join("");
 
-  /* ---------- formulario de registro ---------- */
-  const CARGOS = [
-    "Médico general", "Médico especialista", "Enfermera profesional", "Enfermera ",
-    "Auxiliar de enfermería", "Regente de farmacia", "Auxiliar de farmacia",
-    "Líder de proceso", "Coordinador(a)", "Otro",
-  ];
+  /* ---------- ficha mínima: sede y cargo ----------
+     El nombre y el correo YA VINIERON de Google: no se vuelven a pedir.
+     Solo se elige la sede y el cargo, y se guardan para siempre. */
 
-  const CAMPOS = [
-    { id: "nombre", etiqueta: "Nombre completo *", tipo: "text", req: true, ancho: "completo" },
-    { id: "documento", etiqueta: "Número de documento *", tipo: "text", req: true, ancho: "medio" },
-    { id: "cargo", etiqueta: "Cargo o especialidad *", tipo: "select", req: true, ancho: "medio", opciones: CARGOS },
-    { id: "servicio", etiqueta: "Servicio o área *", tipo: "text", req: true, ancho: "medio" },
-    { id: "centro", etiqueta: "Centro de salud *", tipo: "text", req: true, ancho: "medio" },
-    { id: "telefono", etiqueta: "Teléfono de contacto", tipo: "tel", req: false, ancho: "medio" },
-    { id: "profesional", etiqueta: "¿Es usted profesional de la salud?", tipo: "select", req: false, ancho: "medio",
-      opciones: ["Sí", "No"] },
-  ];
-
-  function pintarFormulario(correo) {
+  function pintarSelectorPerfil(correo) {
     const previo = A.leerRegistro(correo) || {};
-
-    const camposHtml = CAMPOS.map(c => {
-      const v = A.esc(previo[c.id] || "");
-      let control;
-      if (c.tipo === "select") {
-        control =
-          `<select id="f_${c.id}" name="${c.id}">` +
-          `<option value="">Seleccione…</option>` +
-          c.opciones.map(o => `<option value="${A.esc(o)}" ${previo[c.id] === o ? "selected" : ""}>${A.esc(o)}</option>`).join("") +
-          `</select>`;
-      } else {
-        control = `<input type="${c.tipo}" id="f_${c.id}" name="${c.id}" value="${v}" ${c.req ? "required" : ""}>`;
-      }
-      const col = c.ancho === "medio" ? "medio" : "";
-      return `<div class="campo ${col}" data-campo="${c.id}">
-        <label for="f_${c.id}">${A.esc(c.etiqueta)}</label>
-        ${control}
-        <div class="error">Este campo es obligatorio.</div>
-      </div>`;
-    }).join("");
+    const sedes = C.sedes || [];
+    const cargos = C.cargos || [];
 
     return `
-      <form id="formRegistro" novalidate>
+      <form id="formPerfil" novalidate>
         <div class="grilla-campos">
-          <div class="campo completo">
-            <label for="f_correo">Correo de registro (Google)</label>
-            <input type="email" id="f_correo" value="${A.esc(correo)}" readonly>
-            <div class="ayuda">Este correo se usará para emitir el certificado y no se puede modificar.</div>
+          <div class="campo medio">
+            <label for="f_sede">Sede o punto de atención *</label>
+            <select id="f_sede" name="sede">
+              <option value="">Selecciona…</option>
+              ${sedes.map(s => `<option value="${A.esc(s)}" ${previo.sede === s ? "selected" : ""}>${A.esc(s)}</option>`).join("")}
+            </select>
+            <div class="ayuda">Se imprime en tu reconocimiento.</div>
           </div>
-          ${camposHtml}
+          <div class="campo medio">
+            <label for="f_cargo">Cargo *</label>
+            <select id="f_cargo" name="cargo">
+              <option value="">Selecciona…</option>
+              ${cargos.map(c => `<option value="${A.esc(c)}" ${previo.cargo === c ? "selected" : ""}>${A.esc(c)}</option>`).join("")}
+            </select>
+          </div>
         </div>
-        <div class="aviso aviso-info" style="margin-top:.4rem">
-          <strong>Nota sobre el uso de datos</strong>
-          Sus datos se usan exclusivamente para registrar la asistencia, emitir el certificado
-          y soportar el proceso de verificación institucional.
-        </div>
-        <button type="submit" class="btn btn-bloque">Guardar registro y continuar</button>
+        <button type="submit" class="btn btn-bloque">Guardar y continuar</button>
       </form>`;
   }
 
@@ -144,24 +118,27 @@
     if (!usuario) {
       cont.innerHTML = `
         <div class="tarjeta acceso-caja">
-          <h2>Ingreso al curso</h2>
+          <h2>Ingreso a la capacitación</h2>
           <p class="texto-suave">
-            El acceso es exclusivamente con tu cuenta de Google. Esta misma cuenta
-            quedará registrada como tu correo institucional para la emisión del certificado.
+            El acceso es exclusivamente con tu cuenta de Google. De ahí se toman
+            tu nombre y tu correo: no vas a llenar formularios cada vez que entres.
           </p>
           <div class="g-boton" id="zonaBotonGoogle"></div>
           <div class="pasos">
-            <li>Ingresa con tu cuenta de Google.</li>
-            <li>Completa tus datos institucionales.</li>
-            <li>Estudia los 9 módulos del curso.</li>
-            <li>Presenta la evaluación y descarga tu certificado.</li>
+            <li>Ingresa con tu cuenta de Google (una sola vez).</li>
+            <li>Elige tu sede y tu cargo (una sola vez).</li>
+            <li>Estudia y evalúa los 4 protocolos por separado.</li>
+            <li>Descarga el reconocimiento de cada protocolo que apruebes.</li>
           </div>
         </div>`;
       A.Sesion.montarBoton(document.getElementById("zonaBotonGoogle"), () => pintarAcceso());
       return;
     }
 
-    const registrado = A.estaRegistrado(usuario.correo);
+    /* La ficha se crea sola al entrar con Google. */
+    A.registrarDesdeGoogle(usuario);
+    const completo = A.perfilCompleto(usuario.correo);
+    const ficha = A.leerRegistro(usuario.correo) || {};
 
     cont.innerHTML = `
       <div class="tarjeta">
@@ -173,61 +150,66 @@
           </div>
         </div>
 
-        <h2 style="margin-top:1.3rem">
-          ${registrado ? "Tus datos registrados" : "Registro de participante"}
-        </h2>
-        <p class="texto-suave texto-peq">
-          ${registrado
-            ? "Puedes actualizar tus datos si cambiaron de cargo o servicio."
-            : "Completa los siguientes datos para aparecer en el registro oficial del curso y en tu certificado."}
-        </p>
-
-        ${pintarFormulario(usuario.correo)}
+        ${completo
+          ? `<h2 style="margin-top:1.3rem">Tu ficha</h2>
+             <div class="info-certificado" style="text-align:left">
+               <div class="info-cert"><span>Nombre</span><strong>${A.esc(ficha.nombre || usuario.nombre)}</strong></div>
+               <div class="info-cert"><span>Correo</span><strong>${A.esc(usuario.correo)}</strong></div>
+               <div class="info-cert"><span>Sede</span><strong>${A.esc(ficha.sede || "—")}</strong></div>
+               <div class="info-cert"><span>Cargo</span><strong>${A.esc(ficha.cargo || "—")}</strong></div>
+             </div>
+             <p class="texto-suave texto-peq" style="margin-top:.8rem">
+               Tus datos vienen de Google y ya quedaron guardados. Solo se muestran;
+               no se vuelven a pedir.
+             </p>`
+          : `<h2 style="margin-top:1.3rem">Elige tu sede y tu cargo</h2>
+             <p class="texto-suave texto-peq">
+               Es lo único que se te pregunta, y se guarda una sola vez para que
+               aparezca en tu reconocimiento.
+             </p>
+             ${pintarSelectorPerfil(usuario.correo)}`}
 
         <div class="acciones-resultado">
-          <a href="curso.html" class="btn btn-azul">Ir al curso</a>
-          <a href="evaluacion.html" class="btn btn-borde">Ir a la evaluación</a>
+          <a href="protocolos.html" class="btn btn-azul">Ir a los protocolos</a>
+          ${completo ? "" : '<a href="#" class="btn btn-borde" id="btnEditarPerfil">Cambiar sede o cargo</a>'}
         </div>
       </div>`;
 
-    const form = document.getElementById("formRegistro");
-    form.addEventListener("submit", async (ev) => {
-      ev.preventDefault();
-      const btn = form.querySelector('button[type="submit"]');
-      btn.disabled = true;
+    const editar = document.getElementById("btnEditarPerfil");
+    if (editar) {
+      editar.addEventListener("click", (ev) => { ev.preventDefault(); pintarAcceso(); });
+    }
 
-      let ok = true;
-      for (const c of CAMPOS) {
-        const input = document.getElementById("f_" + c.id);
-        const cont2 = form.querySelector('[data-campo="' + c.id + '"]');
-        const vacio = !input.value.trim();
-        cont2.classList.toggle("campo-error", !!c.req && vacio);
-        if (c.req && vacio) ok = false;
-      }
-      if (!ok) {
+    const form = document.getElementById("formPerfil");
+    if (form) {
+      form.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const sede = document.getElementById("f_sede").value.trim();
+        const cargo = document.getElementById("f_cargo").value.trim();
+        if (!sede || !cargo) {
+          A.aviso("Selecciona tu sede y tu cargo para continuar.", "error");
+          return;
+        }
+        const btn = form.querySelector('button[type="submit"]');
+        btn.disabled = true;
+
+        const datos = { sede: sede, cargo: cargo };
+        A.guardarRegistro(usuario.correo, datos);
+        const remoto = await A.Remoto.registrarParticipante(
+          Object.assign({ correo: usuario.correo, nombre: usuario.nombre }, datos)
+        );
+
         btn.disabled = false;
-        alert("Completa todos los campos obligatorios (marcados con *).");
-        return;
-      }
+        if (remoto && remoto.ok === false && remoto.motivo !== "deshabilitado") {
+          A.aviso("Se guardó en este navegador, pero no se pudo enviar al registro central. "
+            + "Motivo: " + (remoto.motivo || remoto.bruto || "desconocido"), "error", 8000);
+          return;
+        }
 
-      const datos = { correo: usuario.correo };
-      for (const c of CAMPOS) datos[c.id] = document.getElementById("f_" + c.id).value.trim();
-
-      datos.googleNombre = usuario.nombre;
-      datos.registro = new Date().toISOString();
-
-      A.guardarRegistro(usuario.correo, datos);
-      const remoto = await A.Remoto.registrarParticipante(datos);
-
-      btn.disabled = false;
-      if (remoto && remoto.ok === false && remoto.motivo !== "deshabilitado") {
-        alert("Se guardó en este navegador, pero no se pudo enviar al registro central.\n\n" +
-              "Motivo: " + (remoto.motivo || remoto.bruto || "desconocido"));
-      }
-
-      alert("Registro guardado correctamente.\n\nCorreo registrado: " + usuario.correo);
-      location.href = "curso.html";
-    });
+        A.aviso("Ficha guardada. Ya puedes iniciar los protocolos.", "ok");
+        setTimeout(() => { location.href = "protocolos.html"; }, 900);
+      });
+    }
   }
 
   pintarAcceso();

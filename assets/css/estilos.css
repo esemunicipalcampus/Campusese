@@ -1,15 +1,20 @@
 /* =========================================================================
    ESE Municipal de Villavicencio  ×  Universidad de los Llanos
-   Hoja de estilos del curso de protocolos
+   Hoja de estilos · protocolos de seguridad del paciente
+   Paleta tomada de los logos oficiales de la ESE
    ========================================================================= */
 
 :root {
-  --verde: #0F6C4A;
-  --verde-claro: #E8F3EE;
-  --verde-oscuro: #0A4E35;
+  --verde: #306090;
+  --verde-claro: #EAF0F8;
+  --verde-oscuro: #23456E;
   --azul: #1B3A6B;
   --azul-claro: #EAF0F8;
   --azul-oscuro: #122947;
+  --magenta: #C03060;
+  --magenta-claro: #FBE9F0;
+  --amarillo: #E0C000;
+  --amarillo-claro: #FDF6D8;
 
   --texto: #1D2733;
   --texto-suave: #5A6875;
@@ -667,3 +672,374 @@ table.datos td:first-child { font-weight: 600; color: var(--verde-oscuro); }
     box-shadow: none; margin: 0; page-break-inside: avoid;
   }
 }
+
+/* =========================================================================
+   LOGOS OFICIALES
+   ========================================================================= */
+
+.logo-ese {
+  height: 62px;
+  width: auto;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+/* El logo de la Universidad de los Llanos es blanco: sobre fondo claro se
+   invierte para que sea legible. */
+.logo-unillanos {
+  height: 46px;
+  width: auto;
+  object-fit: contain;
+  filter: invert(1) grayscale(1) contrast(1.15) brightness(.45);
+}
+
+.portada-doble {
+  align-items: center;
+  justify-content: center;
+  gap: 1.1rem;
+}
+.portada-doble .logo-ese { height: 96px; }
+.portada-doble .logo-unillanos { height: 54px; }
+
+/* =========================================================================
+   TARJETAS DE PROTOCOLO
+   ========================================================================= */
+
+.protocolo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.protocolo-tarjeta {
+  --color-protocolo: var(--verde);
+  background: var(--blanco);
+  border: 1px solid var(--borde);
+  border-top: 5px solid var(--color-protocolo);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra);
+  padding: 1.2rem 1.2rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .8rem;
+}
+
+.pt-cabecera {
+  display: flex;
+  align-items: flex-start;
+  gap: .8rem;
+}
+
+.pt-icono {
+  font-size: 1.9rem;
+  line-height: 1;
+  background: var(--verde-claro);
+  border-radius: 10px;
+  padding: .5rem .55rem;
+}
+
+.pt-num {
+  font-size: .7rem;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--texto-suave);
+  font-weight: 700;
+}
+
+.pt-cabecera h2 {
+  margin: .15rem 0 .1rem;
+  font-size: 1.16rem;
+  color: var(--color-protocolo);
+}
+
+.pt-sub { margin: 0; font-size: .86rem; color: var(--texto-suave); }
+.pt-desc { margin: 0; font-size: .9rem; }
+
+.pill-est {
+  margin-left: auto;
+  font-size: .72rem;
+  font-weight: 700;
+  padding: .25rem .55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.pill-ok      { background: var(--ok-bg);    color: var(--ok); }
+.pill-mal     { background: var(--mal-bg);   color: var(--mal); }
+.pill-avanzando{ background: var(--amarillo-claro); color: var(--alerta); }
+.pill-neutro  { background: #EEF2F5;         color: var(--texto-suave); }
+
+.pt-modulos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+.pt-modulos a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .6rem;
+  padding: .5rem .65rem;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-s);
+  background: #FBFCFD;
+  color: var(--texto);
+  font-size: .87rem;
+}
+.pt-modulos a:hover { border-color: var(--verde); background: var(--verde-claro); }
+.pt-modulos em { font-style: normal; font-size: .74rem; color: var(--texto-suave); }
+.pt-modulos .leido a { background: var(--ok-bg); border-color: #BFE3CE; }
+.pt-modulos .leido em { color: var(--ok); }
+
+.pt-datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem .9rem;
+  font-size: .78rem;
+  color: var(--texto-suave);
+  border-top: 1px dashed var(--borde);
+  padding-top: .6rem;
+}
+.pt-datos b { color: var(--texto); }
+
+.pt-acciones { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: auto; }
+
+/* barra del protocolo en el lector de módulos */
+.pt-barra {
+  --color-protocolo: var(--verde);
+  display: inline-block;
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--color-protocolo);
+  background: var(--verde-claro);
+  border-left: 4px solid var(--color-protocolo);
+  border-radius: var(--radio-s);
+  padding: .3rem .6rem;
+  margin-bottom: .7rem;
+}
+
+.miga {
+  display: inline-block;
+  font-size: .82rem;
+  color: var(--verde);
+  margin-bottom: .5rem;
+}
+
+/* =========================================================================
+   SELECTOR DE PROTOCOLO (chips)
+   ========================================================================= */
+
+.selector-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .85rem;
+  font-weight: 600;
+  padding: .45rem .8rem;
+  border-radius: 999px;
+  border: 1px solid var(--borde);
+  background: #FBFCFD;
+  color: var(--texto);
+}
+.chip:hover { border-color: var(--verde); background: var(--verde-claro); }
+.chip.activo {
+  background: var(--verde);
+  border-color: var(--verde);
+  color: #fff;
+}
+.chip-bloqueado { opacity: .62; }
+
+.protocolo-etiqueta {
+  font-size: .72rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--texto-suave);
+  margin-bottom: .2rem;
+}
+
+/* =========================================================================
+   REGISTRO INSTITUCIONAL
+   ========================================================================= */
+
+.filtros-registro {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem;
+  align-items: flex-end;
+  margin-top: .8rem;
+}
+.filtros-registro .campo { flex: 1 1 150px; margin: 0; }
+.filtros-registro .campo label { font-size: .74rem; }
+.filtros-registro input,
+.filtros-registro select { padding: .45rem .55rem; font-size: .88rem; }
+
+@media print {
+  .filtros-registro { display: none !important; }
+}
+
+/* =========================================================================
+   NOTIFICACIONES TIPO PESTAÑA (TOAST)
+   ========================================================================= */
+
+.capa-avisos {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  max-width: min(92vw, 380px);
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+  padding: .7rem .8rem;
+  border-radius: 10px;
+  border-left: 5px solid var(--azul, #306090);
+  background: #fff;
+  color: #1c2430;
+  box-shadow: 0 8px 24px rgba(16, 32, 56, .18);
+  font-size: .92rem;
+  line-height: 1.35;
+  opacity: 0;
+  transform: translateX(24px);
+  transition: opacity .22s ease, transform .22s ease;
+}
+
+.toast-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.toast-saliendo {
+  opacity: 0;
+  transform: translateX(24px);
+}
+
+.toast-icono {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: .8rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--azul, #306090);
+}
+
+.toast-texto { flex: 1 1 auto; padding-top: .1rem; }
+
+.toast-cerrar {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: #7a8697;
+  cursor: pointer;
+  padding: 0 .1rem;
+}
+.toast-cerrar:hover { color: #1c2430; }
+
+.toast-ok { border-left-color: #1F7A5C; }
+.toast-ok .toast-icono { background: #1F7A5C; }
+
+.toast-error { border-left-color: #C03060; }
+.toast-error .toast-icono { background: #C03060; }
+
+.toast-info { border-left-color: #306090; }
+.toast-info .toast-icono { background: #306090; }
+
+.btn-ok {
+  background: #1F7A5C;
+  border-color: #1F7A5C;
+  color: #fff;
+  cursor: default;
+  opacity: .95;
+}
+
+@media (max-width: 520px) {
+  .capa-avisos { left: .7rem; right: .7rem; bottom: .7rem; max-width: none; }
+}
+
+/* =========================================================================
+   PDF DEL PROCEDIMIENTO Y NOTA SOBRE FIRMAS
+   ========================================================================= */
+
+.pt-pdf {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  margin: .6rem 0 0;
+  padding: .45rem .7rem;
+  border: 1px dashed var(--linea, #d7dee8);
+  border-radius: 8px;
+  background: #f7f9fc;
+  color: var(--azul, #306090);
+  font-size: .86rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.pt-pdf:hover { background: #eef3f9; }
+
+.pt-pdf-inline {
+  float: right;
+  margin-left: .6rem;
+  padding: .25rem .55rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .18);
+  color: inherit;
+  font-size: .78rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.pt-pdf-inline:hover { background: rgba(255, 255, 255, .34); }
+
+.cert-nota-sin-firmas {
+  flex: 1 1 auto;
+  align-self: center;
+  max-width: 62%;
+  font-size: .74rem;
+  line-height: 1.4;
+  color: #55637a;
+  text-align: left;
+}
+
+@media (max-width: 640px) {
+  .pt-pdf-inline { float: none; display: block; margin: .4rem 0 0; }
+  .cert-nota-sin-firmas { max-width: none; text-align: center; margin-bottom: .6rem; }
+}
+
+/* =========================================================================
+   DETALLE DE INTENTOS (registro institucional)
+   ========================================================================= */
+
+.detalle-intentos { margin-top: .3rem; }
+.detalle-intentos summary {
+  cursor: pointer;
+  font-size: .76rem;
+  color: var(--azul, #306090);
+}
+.detalle-intentos ul {
+  margin: .35rem 0 0;
+  padding-left: 1.1rem;
+  font-size: .78rem;
+  color: #4a5769;
+}
+.detalle-intentos li { margin: .12rem 0; }

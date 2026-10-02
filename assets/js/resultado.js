@@ -11,19 +11,40 @@
   const U = A.exigirRegistro();
   if (!U) return;
 
-  const zona = document.getElementById("zonaResultado");
+const zona = document.getElementById("zonaResultado");
   const LETRAS = ["A", "B", "C", "D", "E", "F"];
 
+  /* ---------------- protocolo de esta página ---------------- */
+
+  const qs = new URLSearchParams(location.search);
+
+  function protocoloSolicitado() {
+    const p = qs.get("p") || sessionStorage.getItem("ese_protocolo");
+    if (p && A.protocolo(p)) return p;
+    if (qs.get("codigo")) {
+      const propio = A.obtenerResultados(U.correo).find(function (x) {
+        return x.codigo === qs.get("codigo");
+      });
+      if (propio && A.protocolo(propio.protocolo)) return propio.protocolo;
+    }
+    const conResultado = A.protocolos().find(function (p) {
+      return A.resultadosProtocolo(U.correo, p.id).length > 0;
+    });
+    return conResultado ? conResultado.id : (A.protocolos()[0] || {}).id || "";
+  }
+
+  const idProtocolo = protocoloSolicitado();
+  const P = A.protocolo(idProtocolo);
+  if (P) sessionStorage.setItem("ese_protocolo", P.id);
+
   function resultados() {
-    return A.obtenerResultados(U.correo).slice().sort(function (a, b) {
+    return A.resultadosProtocolo(U.correo, idProtocolo).slice().sort(function (a, b) {
       return new Date(b.fecha) - new Date(a.fecha);
     });
   }
 
   function codigoDeUrl() {
-    const p = new URLSearchParams(location.search).get("codigo");
-    if (p) return p;
-    return sessionStorage.getItem("ese_ultimo_codigo");
+    return qs.get("codigo") || sessionStorage.getItem("ese_ultimo_codigo_" + idProtocolo);
   }
 
   const todos = resultados();
@@ -34,17 +55,40 @@
   if (!r && todos.length) r = todos[0];
   if (!r) r = todos.find(function (x) { return x.aprobado; }) || null;
 
+  document.title = "Resultado · " + (P ? P.nombre : "Protocolo") + " | ESE Municipal × Unillanos";
+
+  /* ---------------- selector de protocolo ---------------- */
+
+  function htmlSelector() {
+    const disponibles = A.protocolos().filter(function (p) {
+      return A.intentosProtocolo(U.correo, p.id) > 0;
+    });
+    if (disponibles.length < 2) return "";
+
+    let h = '<div class="tarjeta selector-protocolo">';
+    h += '<h2>Consultar otro protocolo</h2><div class="selector-chips">';
+    disponibles.forEach(function (p) {
+      const activo = p.id === idProtocolo;
+      const est = A.aproboProtocolo(U.correo, p.id) ? " ✓" : "";
+      h += '<a class="chip' + (activo ? " activo" : "") + '" href="resultado.html?p='
+        + encodeURIComponent(p.id) + '">' + p.icono + " " + A.esc(p.nombre) + est + '</a>';
+    });
+    h += '</div></div>';
+    return h;
+  }
+
   /* ---------------- sin resultados ---------------- */
   if (!r) {
-    zona.innerHTML =
-      '<div class="tarjeta"><div class="vacio">'
+    zona.innerHTML = htmlSelector()
+      + '<div class="tarjeta"><div class="vacio">'
       + '<span class="icono">📝</span>'
-      + '<h2>Aún no has presentado la evaluación</h2>'
-      + '<p>Cuando completes el cuestionario verás aquí tu resultado, el detalle por tema '
-      + 'y la justificación de cada respuesta.</p>'
+      + '<h2>Aún no has presentado esta evaluación</h2>'
+      + '<p>Cuando completes el cuestionario de <b>' + A.esc(P ? P.nombre : "este protocolo")
+      + '</b> verás aquí tu resultado, el detalle por tema y la justificación de cada respuesta.</p>'
       + '<div class="acciones-resultado">'
-      + '<a class="btn" href="curso.html">Ir al curso</a>'
-      + '<a class="btn btn-azul" href="evaluacion.html">Ir a la evaluación</a>'
+      + '<a class="btn" href="protocolos.html">Ir a los protocolos</a>'
+      + (P ? '<a class="btn btn-azul" href="evaluacion.html?p=' + encodeURIComponent(P.id)
+             + '">Ir a la evaluación</a>' : "")
       + '</div></div></div>';
     return;
   }
@@ -54,10 +98,12 @@
   const icono = r.aprobado ? "🎉" : "📘";
   const titulo = r.aprobado ? "Evaluación aprobada" : "Evaluación no aprobada";
 
-  let html = "";
+let html = htmlSelector();
 
   html += '<div class="tarjeta resultado-cabecera ' + claseCabecera + '">';
   html += '<div class="icono">' + icono + '</div>';
+  html += '<div class="protocolo-etiqueta">PROTOCOLO ' + A.esc(P ? P.numero : r.protocoloNumero)
+    + ' · ' + A.esc(P ? P.nombre : r.protocoloNombre) + '</div>';
   html += '<h1>' + titulo + '</h1>';
   html += '<p class="texto-suave">Intento ' + A.esc(r.intento) + ' · ' + A.esc(A.conHora(r.fecha)) + '</p>';
   html += '<div class="nota-grande' + (r.aprobado ? "" : " baja") + '">' + r.porcentaje + '%</div>';
@@ -77,18 +123,21 @@
       + '</div>';
   }
 
-  html += '<div class="acciones-resultado">';
+html += '<div class="acciones-resultado">';
   if (r.aprobado) {
-    html += '<a class="btn btn-azul" href="certificado.html?codigo=' + encodeURIComponent(r.codigo) + '">Ver / descargar certificado</a>';
-  } else {
+    html += '<a class="btn btn-azul" href="certificado.html?p=' + encodeURIComponent(idProtocolo)
+      + '&codigo=' + encodeURIComponent(r.codigo) + '">Ver / descargar certificado</a>';
+  } else if (P) {
     const reintentos = todos.filter(function (x) { return !x.aprobado; }).length;
-    if (reintentos < C.curso.intentosMaximos) {
-      html += '<a class="btn" href="evaluacion.html">Reintentar evaluación</a>';
+    if (reintentos < C.programa.intentosMaximos) {
+      html += '<a class="btn" href="evaluacion.html?p=' + encodeURIComponent(idProtocolo)
+        + '">Reintentar evaluación</a>';
     } else {
-      html += '<button type="button" class="btn" disabled>Has agotado los ' + C.curso.intentosMaximos + ' intentos</button>';
+      html += '<button type="button" class="btn" disabled>Has agotado los '
+        + C.programa.intentosMaximos + ' intentos</button>';
     }
   }
-  html += '<a class="btn btn-borde" href="curso.html">Volver al curso</a>';
+  html += '<a class="btn btn-borde" href="protocolos.html">Volver a los protocolos</a>';
   html += '<button type="button" class="btn btn-borde" id="btnImprimir">Imprimir resultado</button>';
   html += '</div>';
   html += '</div>';
@@ -109,9 +158,9 @@
   html += '</div></div>';
 
   /* ---------------- historial ---------------- */
-  if (todos.length > 1) {
+if (todos.length > 1) {
     html += '<div class="tarjeta">';
-    html += '<h2>Historial de intentos</h2>';
+    html += '<h2>Historial de intentos · ' + A.esc(P ? P.nombre : "") + '</h2>';
     html += '<div class="tabla-envoltura"><table class="datos"><thead><tr>'
       + '<th>Intento</th><th>Fecha</th><th>Puntaje</th><th>Resultado</th><th>Código</th>'
       + '</tr></thead><tbody>';
@@ -130,17 +179,17 @@
   html += '<div class="tarjeta">';
   html += '<h2>Detalle de respuestas</h2>';
   html += '<div class="tabs">';
-  r.temas.forEach(function (t, i) {
+r.temas.forEach(function (t, i) {
     html += '<button type="button" class="tab' + (i === 0 ? " activo" : "") + '" data-tema="'
-      + A.esc(t.id) + '">Tema ' + t.numero + '</button>';
+      + A.esc(t.id) + '">' + A.esc(t.titulo) + '</button>';
   });
   html += '</div>';
 
-  r.temas.forEach(function (t, i) {
+r.temas.forEach(function (t, i) {
     html += '<div class="detalle-tema' + (i === 0 ? "" : " oculto") + '" data-tema="' + A.esc(t.id) + '">';
-    html += '<h3>Tema ' + t.numero + ': ' + A.esc(t.titulo) + ' <small class="texto-suave">('
-      + t.aciertos + '/' + t.total + ')</small></h3>';
-    r.detalle.filter(function (d) { return String(d.temaNumero) === String(t.numero); })
+    html += '<h3>' + A.esc(t.titulo) + ' <small class="texto-suave">('
+      + t.aciertos + '/' + t.total + ' · ' + t.porcentaje + '%)</small></h3>';
+    r.detalle.filter(function (d) { return d.temaId === t.id; })
       .forEach(function (d) {
         html += '<div class="detalle-pregunta">';
         html += '<div class="cab"><span class="pregunta-num">' + A.esc(d.ref) + '</span>'

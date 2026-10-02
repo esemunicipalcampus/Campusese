@@ -1,10 +1,10 @@
-/**
+﻿/**
  * =========================================================================
  *  ESE MUNICIPAL DE VILLAVICENCIO × UNIVERSIDAD DE LOS LLANOS
- *  Backend del curso de protocolos — Google Apps Script
+ *  Backend de los protocolos de seguridad del paciente — Google Apps Script
  * -------------------------------------------------------------------------
- *  Almacena el registro de participantes y los resultados de las
- *  evaluaciones en Google Sheets, y permite verificar certificados por código.
+ *  Guarda el registro de participantes, los resultados por PROTOCOLO y los
+ *  certificados emitidos, y alimenta el registro institucional interno.
  *
  *  INSTALACIÓN (5 minutos):
  *    1. Abre https://script.google.com  → "Nuevo proyecto"
@@ -18,8 +18,10 @@
  *         · Quién tiene acceso:  Cualquier persona
  *    6. Copia la URL que termina en /exec y pégala en
  *       CONFIG.appsScriptUrl  (archivo assets/js/config.js)
- *    7. Opcional: en  CONFIG.appsScriptSecret  pon una contraseña larga
- *       y repítela en  CLAVE  más abajo, para que solo tu sitio escriba.
+ *    7. En  CLAVE  (abajo) pon una contraseña larga para el registro
+ *       institucional: es la que se escribe en registro.html.
+ *    8. Opcional: pon la MISMA contraseña en CONFIG.appsScriptSecret para
+ *       que solo tu sitio pueda escribir en la hoja.
  * =========================================================================
  */
 
@@ -27,7 +29,7 @@
  * CONFIGURACIÓN
  * ------------------------------------------------------------------ */
 
-/** Contraseña compartida. Debe coincidir con CONFIG.appsScriptSecret. */
+/** Código de acceso del registro institucional (registro.html). */
 var CLAVE = "CLAVE_SECRETA_LARGA_Y_UNICA_AQUI";
 
 /** Nombres de las pestañas de la hoja de cálculo. */
@@ -36,10 +38,27 @@ var HOJA_RESULTADOS = "Resultados";
 var HOJA_CERTIFICADOS = "Certificados";
 
 /** Nombre del archivo de hoja de cálculo. Se crea si no existe. */
-var NOMBRE_SPREADSHEET = "Registro Curso Protocolos - ESE Villavicencio";
+var NOMBRE_SPREADSHEET = "Registro Protocolos ESE - ESE Villavicencio";
 
 /** Método de entrega del frontend. "json" para fetch directo. */
 var MODO_RESPUESTA = "json";
+
+/** Encabezados de cada hoja (el orden define los índices). */
+var COLUMNAS_REGISTRO = [
+  "Fecha registro", "Correo", "Nombre", "Sede", "Cargo", "Correo verificado"
+];
+
+var COLUMNAS_RESULTADOS = [
+  "Fecha", "Código", "Correo", "Nombre", "Sede", "Cargo",
+  "Protocolo", "Protocolo (nombre)", "Intento", "Aciertos", "Total", "Porcentaje",
+  "Aprobado", "Temas"
+];
+
+var COLUMNAS_CERTIFICADOS = [
+  "Código", "Fecha expedición", "Nombre", "Correo", "Sede", "Cargo",
+  "Protocolo", "Protocolo (nombre)",
+  "Intento", "Aciertos", "Total", "Porcentaje", "Temas"
+];
 
 /* --------------------------------------------------------------------
  * PUNTO DE ENTRADA ÚNICO
@@ -57,13 +76,13 @@ function doPost(e) {
 }
 
 function doGet(e) {
-  // Permite consultar por URL: ?accion=consulta&codigo=ESE-VLL-2026-000123
+  // Consulta pública por URL:
+  //   ?accion=consulta&codigo=ESE-VLL-2026-CAUZ-000123
   var p = (e && e.parameter) || {};
   var salida;
   try {
     salida = manejar({
       accion: p.accion || "consulta",
-      clave: p.clave || "",
       datos: { codigo: (p.codigo || "").toUpperCase() }
     });
   } catch (err) {
@@ -91,22 +110,24 @@ function responder(objeto) {
 
 function manejar(payload) {
   var accion = String(payload.accion || "").toLowerCase();
+  var datos = payload.datos || {};
 
-  // La consulta de verificación es pública (para que cualquiera valide).
-  if (accion === "consulta") {
-    return consultarCodigo(payload.datos || {});
-  }
+  // Verificación de certificados: pública, para que cualquiera valide.
+  if (accion === "consulta") return consultarCodigo(datos);
 
-  // El resto exige la clave compartida.
+  // Registro institucional: pide el código de acceso, no la clave del sitio.
+  if (accion === "registrointerno") return listarAprobados(datos);
+
+  // El resto exige la clave compartida del sitio.
   if (CLAVE && CLAVE !== "CAMBIA_ESTA_CLAVE" && payload.clave !== CLAVE) {
     return { ok: false, error: "Clave incorrecta" };
   }
 
   switch (accion) {
     case "registro":
-      return registrarParticipante(payload.datos || {});
+      return registrarParticipante(datos);
     case "resultado":
-      return registrarResultado(payload.datos || {});
+      return registrarResultado(datos);
     case "listado":
       return listarParticipantes();
     default:
@@ -124,24 +145,17 @@ function registrarParticipante(d) {
 
   var ss = obtenerSpreadsheet();
   var hoja = ss.getSheetByName(HOJA_REGISTRO);
-  asegurarEncabezados(hoja, [
-    "Fecha registro", "Correo", "Nombre", "Documento", "Cargo",
-    "Servicio", "Centro de salud", "Teléfono", "Profesional", "Correo verificado"
-  ]);
+  asegurarEncabezados(hoja, COLUMNAS_REGISTRO);
 
   // Actualiza si ya existe (evita duplicados por reintentos).
-  var fila = buscarFilaPorCorreo(hoja, correo, 2);
+  var fila = buscarFilaPorColumna(hoja, correo, 2);
   var registro = [
-    new Date(),
-    correo,
-    d.nombre || "",
-    d.documento || "",
+    new Date(d.registro || d.fecha || ahora),
+    d.correo || "",
+    d.nombre || d.googleNombre || "",
+    d.sede || "",
     d.cargo || "",
-    d.servicio || "",
-    d.centro || "",
-    d.telefono || "",
-    d.profesional || "",
-    d.googleNombre || "",
+    d.emailVerified ? "Sí" : (d.correoVerificado ? "Sí" : "No")
   ];
 
   if (fila > 0) {
@@ -160,34 +174,29 @@ function registrarResultado(d) {
 
   var ss = obtenerSpreadsheet();
   var hoja = ss.getSheetByName(HOJA_RESULTADOS);
-  asegurarEncabezados(hoja, [
-    "Fecha", "Código", "Correo", "Nombre", "Documento", "Cargo", "Centro",
-    "Intento", "Puntaje", "Total", "Porcentaje", "Aprobado", "Temas"
-  ]);
+  asegurarEncabezados(hoja, COLUMNAS_RESULTADOS);
 
   hoja.appendRow([
     new Date(),
     codigo,
     correo,
-    d.nombre || "",
-    d.documento || "",
+d.nombre || "",
+    d.sede || "",
     d.cargo || "",
-    d.centro || "",
+    d.protocolo || "",
+    d.protocoloNombre || "",
     d.intento || 1,
     d.aciertos || 0,
     d.total || 0,
     d.porcentaje || 0,
-    d.aprobado ? "SÍ" : "NO",
+    d.aprobado ? "Sí" : "NO",
     resumenTemas(d.temas)
   ]);
 
-  // Solo los aprobados generan certificado.
+  // Solo los aprobados generan certificado, y solo una vez por código.
   if (d.aprobado) {
     var hc = ss.getSheetByName(HOJA_CERTIFICADOS);
-    asegurarEncabezados(hc, [
-      "Código", "Fecha expedición", "Nombre", "Correo", "Documento",
-      "Cargo", "Servicio", "Centro", "Puntaje", "Total", "Porcentaje", "Temas"
-    ]);
+    asegurarEncabezados(hc, COLUMNAS_CERTIFICADOS);
 
     if (buscarFilaPorColumna(hc, codigo, 1) === 0) {
       hc.appendRow([
@@ -195,10 +204,11 @@ function registrarResultado(d) {
         new Date(),
         d.nombre || "",
         correo,
-        d.documento || "",
+        d.sede || "",
         d.cargo || "",
-        d.servicio || "",
-        d.centro || "",
+        d.protocolo || "",
+        d.protocoloNombre || "",
+        d.intento || 1,
         d.aciertos || 0,
         d.total || 0,
         d.porcentaje || 0,
@@ -208,6 +218,77 @@ function registrarResultado(d) {
   }
 
   return { ok: true, codigo: codigo };
+}
+
+/**
+ * Registro institucional: quién aprobó cada protocolo, con fecha y nota.
+ * Solo se ejecuta con el código de acceso correcto.
+ */
+function listarAprobados(d) {
+  var clave = String(d.codigoAcceso || "");
+  if (!CLAVE || CLAVE === "CLAVE_SECRETA_LARGA_Y_UNICA_AQUI") {
+    return { ok: false, error: "El backend no tiene código de acceso configurado" };
+  }
+  if (clave !== CLAVE) return { ok: false, error: "Código de acceso incorrecto" };
+
+  var ss = obtenerSpreadsheet();
+  var hc = ss.getSheetByName(HOJA_CERTIFICADOS);
+  if (!hc || hc.getLastRow() < 2) {
+    return { ok: true, total: 0, generados: hoyIso(), registros: [] };
+  }
+
+  var filas = hc.getDataRange().getValues().slice(1);
+  var fProtocolo = normalizar(d.protocolo);
+  var desde = normalizar(d.desde);
+  var hasta = normalizar(d.hasta);
+  var q = String(d.q || "").trim().toLowerCase();
+
+  var registros = filas
+    .map(function (f) {
+      return {
+        codigo: f[0],
+        fecha: formatearFechaIso(f[1]),
+        nombre: f[2],
+        correo: f[3],
+        sede: f[4],
+        cargo: f[5],
+        protocolo: f[6],
+        protocoloNombre: f[7],
+        intento: f[8],
+        aciertos: f[9],
+        total: f[10],
+        porcentaje: f[11],
+        temas: f[12]
+      };
+    })
+    .filter(function (r) {
+      if (fProtocolo && normalizar(r.protocolo) !== fProtocolo) return false;
+      if (desde && r.fecha < desde) return false;
+      if (hasta && r.fecha > hasta) return false;
+      if (q) {
+        var texto = [r.nombre, r.correo, r.codigo, r.sede, r.cargo]
+          .join(" ").toLowerCase();
+        if (texto.indexOf(q) === -1) return false;
+      }
+      return true;
+    })
+    .sort(function (a, b) { return a.fecha < b.fecha ? 1 : -1; });
+
+  // Resumen por protocolo.
+  var resumen = {};
+  registros.forEach(function (r) {
+    var k = r.protocoloNombre || r.protocolo || "Sin protocolo";
+    if (!resumen[k]) resumen[k] = 0;
+    resumen[k]++;
+  });
+
+  return {
+    ok: true,
+    total: registros.length,
+    resumen: resumen,
+    generados: hoyIso(),
+    registros: registros
+  };
 }
 
 function consultarCodigo(d) {
@@ -221,7 +302,7 @@ function consultarCodigo(d) {
   var fila = buscarFilaPorColumna(hc, codigo, 1);
   if (fila === 0) return { ok: true, encontrado: false, codigo: codigo };
 
-  var v = hc.getRange(fila, 1, 1, 12).getValues()[0];
+  var v = hc.getRange(fila, 1, 1, COLUMNAS_CERTIFICADOS.length).getValues()[0];
   return {
     ok: true,
     encontrado: true,
@@ -231,14 +312,15 @@ function consultarCodigo(d) {
       fecha: formatearFecha(v[1]),
       nombre: v[2],
       correo: v[3],
-      documento: v[4],
+      sede: v[4],
       cargo: v[5],
-      servicio: v[6],
-      centro: v[7],
-      aciertos: v[8],
-      total: v[9],
-      porcentaje: v[10],
-      temas: v[11]
+      protocolo: v[6],
+      protocoloNombre: v[7],
+      intento: v[8],
+      aciertos: v[9],
+      total: v[10],
+      porcentaje: v[11],
+      temas: v[12]
     }
   };
 }
@@ -250,18 +332,17 @@ function listarParticipantes() {
 
   var datos = hoja.getDataRange().getValues();
   var filas = datos.slice(1);
-  var participants = filas.map(function (f) {
+  var participantes = filas.map(function (f) {
     return {
+      fecha: formatearFecha(f[0]),
       correo: f[1],
       nombre: f[2],
-      documento: f[3],
+      sede: f[3],
       cargo: f[4],
-      servicio: f[5],
-      centro: f[6],
-      fecha: formatearFecha(f[0])
+      verificado: f[5]
     };
   });
-  return { ok: true, total: participants.length, participantes: participants };
+  return { ok: true, total: participantes.length, participantes: participantes };
 }
 
 /* --------------------------------------------------------------------
@@ -270,9 +351,7 @@ function listarParticipantes() {
 
 function obtenerSpreadsheet() {
   var ss = buscarPorNombre(NOMBRE_SPREADSHEET);
-  if (!ss) {
-    ss = SpreadsheetApp.create(NOMBRE_SPREADSHEET);
-  }
+  if (!ss) ss = SpreadsheetApp.create(NOMBRE_SPREADSHEET);
   crearHojas(ss);
   return ss;
 }
@@ -302,25 +381,23 @@ function asegurarEncabezados(hoja, columnas) {
       .getRange(1, 1, 1, columnas.length)
       .setValues([columnas])
       .setFontWeight("bold")
-      .setBackground("#0F6C4A")
+      .setBackground("#306090")
       .setFontColor("#FFFFFF");
     hoja.setFrozenRows(1);
   }
 }
 
 function buscarFilaPorColumna(hoja, valor, columna) {
-  var rango = hoja.getRange(hoja.getLastRow(), columna, hoja.getLastRow(), 1);
+  var ultima = hoja.getLastRow();
+  if (ultima < 1) return 0;
+  var rango = hoja.getRange(ultima, columna, ultima, 1);
   var valores = rango.getValues();
   for (var i = 0; i < valores.length; i++) {
     if (String(valores[i][0]).trim().toUpperCase() === String(valor).trim().toUpperCase()) {
-      return hoja.getLastRow() - valores.length + i + 1;
+      return ultima - valores.length + i + 1;
     }
   }
   return 0;
-}
-
-function buscarFilaPorCorreo(hoja, correo, columna) {
-  return buscarFilaPorColumna(hoja, correo, columna);
 }
 
 function normalizar(correo) {
@@ -331,7 +408,7 @@ function resumenTemas(temas) {
   if (!temas || !temas.length) return "";
   return temas
     .map(function (t) {
-      return t.numero + ". " + t.titulo + " (" + t.porcentaje + "%)";
+      return t.titulo + " (" + t.porcentaje + "%)";
     })
     .join(" | ");
 }
@@ -342,6 +419,16 @@ function formatearFecha(valor) {
   return Utilities.formatDate(f, Session.getScriptTimeZone(), "dd/MM/yyyy");
 }
 
+function formatearFechaIso(valor) {
+  if (!valor) return "";
+  var f = valor instanceof Date ? valor : new Date(valor);
+  return Utilities.formatDate(f, Session.getScriptTimeZone(), "yyyy-MM-dd");
+}
+
+function hoyIso() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm");
+}
+
 function htmlEscape(s) {
   return String(s)
     .replace(/&/g, "&amp;")
@@ -350,29 +437,30 @@ function htmlEscape(s) {
 }
 
 /* --------------------------------------------------------------------
- * PRUEBA RÁPIDA — ejecutar desde el editor
+ * PRUEBA MANUAL (opcional).
+ * Ejecuta esta funcion una vez desde el editor para comprobar que la hoja
+ * recibe datos. Luego borra la fila de prueba que queda.
  * ------------------------------------------------------------------ */
-
 function testRegistro() {
   var r1 = registrarResultado({
-    codigo: "ESE-VLL-2026-000001",
+    codigo: "ESE-VLL-2026-CAUZ-000001",
     correo: "prueba@esevillavicencio.gov.co",
     nombre: "Participante de Prueba",
-    documento: "12345678",
-    cargo: "Enfermera profesional",
-    servicio: "Urgencias",
-    centro: "Centro de Salud Recreo",
+    sede: "CAMPUS ESE MUNICIPAL",
+    cargo: "Enfermeria",
+    protocolo: "codigo-azul",
+    protocoloNombre: "Codigo Azul",
     intento: 1,
-    aciertos: 90,
-    total: 92,
-    porcentaje: 98,
+    aciertos: 9,
+    total: 10,
+    porcentaje: 90,
     aprobado: true,
-    temas: [{ numero: 1, titulo: "Código Azul", porcentaje: 100 }]
+    temas: [{ titulo: "Codigo Azul", porcentaje: 90 }]
   });
-  Logger.log("registroResultado: " + JSON.stringify(r1));
+  Logger.log("registrarResultado: " + JSON.stringify(r1));
 
-  var r2 = consultarCodigo({ codigo: "ESE-VLL-2026-000001" });
+  var r2 = consultarCodigo({ codigo: "ESE-VLL-2026-CAUZ-000001" });
   Logger.log("consulta: " + JSON.stringify(r2));
 
-  Logger.log("Abandoné una fila de prueba en " + NOMBRE_SPREADSHEET + ".");
+  Logger.log("Queda una fila de prueba en " + NOMBRE_SPREADSHEET + ".");
 }

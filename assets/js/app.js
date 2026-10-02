@@ -89,16 +89,54 @@
     },
   };
 
-  /* Registro de participantes: objeto { correo: {datos} } */
+  /* ---------------------------------------------------------------------
+   * Registro de participantes: objeto { correo: {datos} }
+   *
+   * La persona NO vuelve a escribir sus datos: se toma lo que entrega
+   * Google (nombre y correo verificado) y solo se le pide UNA vez elegir
+   * su sede y su cargo, que se guardan aquí para siempre.
+   * ------------------------------------------------------------------- */
   function obtenerRegistro() { return BD.leer(CLAVES.registro, {}) || {}; }
   function guardarRegistro(correo, datos) {
     const reg = obtenerRegistro();
-    reg[correo] = Object.assign({}, reg[correo], datos, { correo, actualizado: iso(new Date()) });
+    const anterior = reg[correo] || {};
+    reg[correo] = Object.assign({}, anterior, datos, {
+      correo,
+      creado: anterior.creado || iso(new Date()),
+      actualizado: iso(new Date()),
+    });
     BD.escribir(CLAVES.registro, reg);
     return reg[correo];
   }
   function leerRegistro(correo) { return obtenerRegistro()[correo] || null; }
   function estaRegistrado(correo) { return !!leerRegistro(correo); }
+
+  /**
+   * Registra a la persona automáticamente con los datos de Google y le
+   * asigna sede/cargo si todavía no los ha elegido. No pide ningún dato:
+   * solo deja lista la ficha la primera vez.
+   */
+  function registrarDesdeGoogle(usuario) {
+    if (!usuario || !usuario.correo) return null;
+    const previo = leerRegistro(usuario.correo) || {};
+    const sede = previo.sede || (C.sedes && C.sedes[0]) || "";
+    const cargo = previo.cargo || "";
+    return guardarRegistro(usuario.correo, {
+      nombre: usuario.nombre || previo.nombre || "Participante",
+      correo: usuario.correo,
+      correoVerificado: usuario.emailVerified !== false,
+      foto: usuario.foto || previo.foto || "",
+      sede: sede,
+      cargo: cargo,
+      origen: previo.origen || "google",
+    });
+  }
+
+  /** ¿La ficha ya tiene sede y cargo confirmados? */
+  function perfilCompleto(correo) {
+    const r = leerRegistro(correo);
+    return !!(r && r.sede && r.cargo);
+  }
 
   /* Resultados: arreglo de intentos */
   function obtenerResultados(correo) {
@@ -132,13 +170,66 @@
   }
 
   /* ====================================================================
-   * Código de certificado
+   * Protocolos
    * ================================================================= */
+
+  /** Lista de protocolos desde la configuración. */
+  function protocolos() {
+    return C.protocolos || [];
+  }
+
+  /** Busca un protocolo por su id. */
+  function protocolo(id) {
+    return protocolos().find(function (p) { return p.id === id; }) || null;
+  }
+
+  /** Protocolo al que pertenece un tema del banco de preguntas. */
+  function protocoloDeTema(temaId) {
+    return protocolos().find(function (p) {
+      return (p.temas || []).includes(temaId);
+    }) || null;
+  }
+
+  /** Nº total de preguntas de un protocolo. */
+  function totalPreguntasProtocolo(id) {
+    const p = protocolo(id);
+    if (!p || !window.BancoPreguntas) return 0;
+    return window.BancoPreguntas.totalDeTemas(p.temas || []);
+  }
+
+  /** Resultados de un participante para un protocolo concreto. */
+  function resultadosProtocolo(correo, idProtocolo) {
+    return obtenerResultados(correo).filter(function (r) {
+      return r.protocolo === idProtocolo;
+    });
+  }
+
+  /** ¿El participante ya aprobó este protocolo? */
+  function aproboProtocolo(correo, idProtocolo) {
+    return resultadosProtocolo(correo, idProtocolo).some(function (r) { return r.aprobado; });
+  }
+
+  /** Intentos usados en un protocolo. */
+  function intentosProtocolo(correo, idProtocolo) {
+    return resultadosProtocolo(correo, idProtocolo).length;
+  }
+
+  /** Código único por protocolo: ESE-VLL-<ANIO>-<PROTOCOLO>-<NNNNNN> */
   function generarCodigo(correo, resultado) {
-    const base = [correo, resultado.puntaje, resultado.total, resultado.fecha].join("|");
+    const proto = protocolo(resultado.protocolo);
+    const sig = proto
+      ? (proto.sigla || proto.id.replace(/[^a-z0-9]/g, "").slice(0, 4).toUpperCase())
+      : "PRT";
+    const base = [
+      correo,
+      resultado.protocolo || "",
+      resultado.aciertos,
+      resultado.total,
+      resultado.fecha,
+    ].join("|");
     const n = (hash(base) % 1000000).toString().padStart(6, "0");
     const anio = new Date(resultado.fecha).getFullYear();
-    return C.certificado.prefijoCodigo + "-" + anio + "-" + n;
+    return C.reconocimiento.prefijoCodigo + "-" + anio + "-" + sig + "-" + n;
   }
 
   /* ====================================================================
@@ -169,6 +260,20 @@
     registrarParticipante(datos) { return this.enviar("registro", datos); },
     registrarResultado(datos) { return this.enviar("resultado", datos); },
     consultarCodigo(codigo) { return this.enviar("consulta", { codigo }); },
+
+    /**
+     * Registro institucional. El código de acceso lo escribe el usuario y
+     * lo valida el backend; no está incrustado en esta página.
+     */
+    async registroAprobados(codigoAcceso, filtros) {
+      return this.enviar("registroInterno", {
+        codigoAcceso: codigoAcceso,
+        protocolo: (filtros && filtros.protocolo) || "",
+        desde: (filtros && filtros.desde) || "",
+        hasta: (filtros && filtros.hasta) || "",
+        q: (filtros && filtros.q) || ""
+      });
+    },
   };
 
   /* ====================================================================
@@ -231,6 +336,7 @@
             demo: true,
             fecha: iso(new Date()),
           });
+          registrarDesdeGoogle(this.usuario);
           callback && callback(this.usuario);
         });
         return;
@@ -266,10 +372,14 @@
                   demo: false,
                   fecha: iso(new Date()),
                 });
+              /* La ficha se crea sola con los datos de Google: la persona
+                   no vuelve a escribir nombre ni correo. */
+                registrarDesdeGoogle(this.usuario);
+                aviso("Sesión iniciada. Tus datos se toman automáticamente de Google.", "ok");
                 callback && callback(this.usuario);
               } catch (e) {
                 console.error("No se pudo procesar la respuesta de Google", e);
-                alert("Ocurrió un error al procesar tu cuenta de Google. Intenta de nuevo.");
+                aviso("Ocurrió un error al procesar tu cuenta de Google. Intenta de nuevo.", "error");
               }
             },
           });
@@ -303,15 +413,16 @@
     if (!cont) return;
 
     const usuario = Sesion.leer();
-    const enCurso = location.pathname.endsWith("curso.html") ||
+    const enCurso = location.pathname.endsWith("protocolos.html") ||
+                    location.pathname.endsWith("modulo.html") ||
                     location.pathname.endsWith("evaluacion.html") ||
                     location.pathname.endsWith("resultado.html") ||
                     location.pathname.endsWith("certificado.html");
 
     const enlaces = [
-      { href: "curso.html", texto: "Curso" },
-      { href: "evaluacion.html", texto: "Evaluación" },
-      { href: "certificado.html", texto: "Mi certificado" },
+      { href: "protocolos.html", texto: "Protocolos" },
+      { href: "resultado.html", texto: "Mis resultados" },
+      { href: "certificado.html", texto: "Mis certificados" },
     ];
 
     let nav = "";
@@ -334,12 +445,12 @@
 
     cont.innerHTML = `
       <div class="marca">
-        <img class="logo" src="${C.entidadSalud.logo}" alt="${esc(C.entidadSalud.sigla)}">
+        <img class="logo logo-ese" src="${C.entidadSalud.logo}" alt="${esc(C.entidadSalud.sigla)}">
         <img class="separador" src="assets/img/separador.svg" alt="" aria-hidden="true">
-        <img class="logo" src="${C.entidadAcademica.logo}" alt="${esc(C.entidadAcademica.sigla)}">
+        <img class="logo logo-unillanos" src="${C.entidadAcademica.logo}" alt="${esc(C.entidadAcademica.sigla)}">
         <div class="marca-textos">
           <strong>${esc(C.entidadSalud.sigla)} <span class="y">×</span> ${esc(C.entidadAcademica.sigla)}</strong>
-          <span>${esc(C.curso.titulo)}</span>
+          <span>${esc(C.programa.titulo)}</span>
         </div>
       </div>
       ${enCurso && usuario ? `<nav class="nav">${nav}</nav>` : ""}
@@ -370,17 +481,56 @@
   }
 
   /**
-   * Redirige a index.html si el participante aún no completó el registro
-   * institucional. Se usa en las páginas que ya no deben perder datos.
+   * Garantiza que la persona tenga ficha. Se llama al entrar con Google:
+   * crea el registro con los datos de la cuenta y, si falta elegir sede
+   * o cargo, envía a index.html solo para esa selección (no para pedir
+   * nombre, correo ni documento, que ya vienen de Google).
    */
   function exigirRegistro() {
     const u = exigirSesion();
     if (!u) return null;
-    if (!estaRegistrado(u.correo)) {
-      location.replace("index.html?motivo=registro");
+    registrarDesdeGoogle(u);
+    if (!perfilCompleto(u.correo)) {
+      location.replace("index.html?motivo=perfil");
       return null;
     }
     return u;
+  }
+
+  /* ====================================================================
+   * Notificaciones tipo pestaña (toast)
+   * ------------------------------------------------------------------
+   * Uso: App.aviso("Módulo leído", "ok")
+   *      tipos: "ok" (verde) · "info" (azul) · "error" (rojo)
+   * ==================================================================== */
+  function aviso(texto, tipo, duracion) {
+    if (!texto) return;
+    const clase = tipo === "error" ? "toast-error" : tipo === "info" ? "toast-info" : "toast-ok";
+    let capa = $("#capaAvisos");
+    if (!capa) {
+      capa = document.createElement("div");
+      capa.id = "capaAvisos";
+      capa.className = "capa-avisos";
+      capa.setAttribute("aria-live", "polite");
+      capa.setAttribute("aria-atomic", "false");
+      document.body.appendChild(capa);
+    }
+    const t = document.createElement("div");
+    t.className = "toast " + clase;
+    t.setAttribute("role", "status");
+    const icono = tipo === "error" ? "✕" : tipo === "info" ? "i" : "✓";
+    t.innerHTML = `<span class="toast-icono">${icono}</span><span class="toast-texto"></span><button type="button" class="toast-cerrar" aria-label="Cerrar aviso">×</button>`;
+    t.querySelector(".toast-texto").textContent = texto;
+    capa.appendChild(t);
+    requestAnimationFrame(() => t.classList.add("toast-visible"));
+    const quitar = () => {
+      t.classList.remove("toast-visible");
+      t.classList.add("toast-saliendo");
+      setTimeout(() => t.remove(), 300);
+    };
+    const btn = t.querySelector(".toast-cerrar");
+    if (btn) btn.addEventListener("click", quitar);
+    setTimeout(quitar, duracion || 4000);
   }
 
   /* ====================================================================
@@ -412,8 +562,11 @@
     $, $$, esc, fechaLarga, fechaCorta, conHora, iso, hash,
     BD, Sesion, Remoto,
     obtenerRegistro, guardarRegistro, leerRegistro, estaRegistrado,
+    registrarDesdeGoogle, perfilCompleto, aviso,
     obtenerResultados, guardarResultado,
     obtenerProgreso, marcarModuloLeido, modulosLeidos,
+    protocolos, protocolo, protocoloDeTema,
+    totalPreguntasProtocolo, resultadosProtocolo, aproboProtocolo, intentosProtocolo,
     generarCodigo,
     pintarEncabezado, exigirSesion, exigirRegistro, paginaActual,
   };

@@ -1,4 +1,4 @@
-/* =========================================================================
+﻿/* =========================================================================
  * CONTENIDO DEL CURSO
  * Transcrito de los cuatro procedimientos de la ESE Municipal de Villavicencio:
  *   · Procedimiento de Código Azul
@@ -28,7 +28,8 @@ window.CURSO = {
      * ------------------------------------------------------------- */
     {
       numero: 1,
-      temaId: "codigo-azul-organizacion",
+      protocolo: "codigo-azul",
+      temaId: "codigo-azul",
       titulo: "Código Azul",
       subtitulo: "Definición, activación y conformación del equipo de respuesta",
       icono: "🚨",
@@ -111,7 +112,8 @@ window.CURSO = {
      * ------------------------------------------------------------- */
     {
       numero: 2,
-      temaId: "rcp-basica-adulto",
+      protocolo: "codigo-azul",
+      temaId: "codigo-azul",
       titulo: "Reanimación Cardiopulmonar Básica en el Adulto",
       subtitulo: "Valoración inicial, compresiones torácicas y ventilación",
       icono: "🫀",
@@ -164,7 +166,8 @@ window.CURSO = {
      * ------------------------------------------------------------- */
     {
       numero: 3,
-      temaId: "rcp-mujer-gestante",
+      protocolo: "codigo-azul",
+      temaId: "codigo-azul",
       titulo: "RCP en la Mujer Gestante",
       subtitulo: "Ajuste de las maniobras por los cambios fisiológicos del embarazo",
       icono: "🤰",
@@ -210,7 +213,8 @@ window.CURSO = {
      * ------------------------------------------------------------- */
     {
       numero: 4,
-      temaId: "rcp-pediatrica-neonatal",
+      protocolo: "codigo-azul",
+      temaId: "codigo-azul",
       titulo: "RCP Pediátrica y Neonatal",
       subtitulo: "Frecuencia, profundidad y ventilación por grupo etario",
       icono: "👶",
@@ -267,7 +271,8 @@ window.CURSO = {
      * ------------------------------------------------------------- */
     {
       numero: 5,
-      temaId: "cadena-supervivencia",
+      protocolo: "codigo-azul",
+      temaId: "codigo-azul",
       titulo: "Cadena de Supervivencia y Cuidados Posteriores",
       subtitulo: "Organización de las acciones desde el reconocimiento del paro",
       icono: "⛓️",
@@ -308,7 +313,8 @@ window.CURSO = {
      * ------------------------------------------------------------- */
     {
       numero: 6,
-      temaId: "carro-paro-conceptos",
+      protocolo: "carro-paro",
+      temaId: "carro-paro",
       titulo: "Carro de Paro: Concepto y Manejo",
       subtitulo: "Qué es, por qué importa y quién debe estar capacitado",
       icono: "🚑",
@@ -360,7 +366,8 @@ window.CURSO = {
      * ------------------------------------------------------------- */
     {
       numero: 7,
-      temaId: "carro-paro-registros",
+      protocolo: "carro-paro",
+      temaId: "carro-paro",
       titulo: "Carro de Paro: Registros y Responsables",
       subtitulo: "Acta de apertura, control por cargo, equipos y revisión mensual",
       icono: "📋",
@@ -461,6 +468,7 @@ window.CURSO = {
      * ------------------------------------------------------------- */
     {
       numero: 8,
+      protocolo: "ronda-seguridad",
       temaId: "ronda-seguridad",
       titulo: "Ronda de Seguridad",
       subtitulo: "Seguimiento a las buenas prácticas de seguridad del paciente",
@@ -532,6 +540,7 @@ window.CURSO = {
      * ------------------------------------------------------------- */
     {
       numero: 9,
+      protocolo: "entrega-turno",
       temaId: "entrega-turno",
       titulo: "Recibo y Entrega de Turno de Enfermería",
       subtitulo: "Continuidad, seguridad del paciente y responsabilidad compartida",

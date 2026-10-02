@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Registro institucional · ESE Municipal × Unillanos</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="assets/logos/eselogo.jpg">
+<link rel="stylesheet" href="assets/css/estilos.css">
+</head>
+<body>
+
+<header class="encabezado" id="encabezado"></header>
+
+<main class="envoltura envoltura-ancha">
+
+  <section class="tarjeta">
+    <h1>Registro institucional de protocolos</h1>
+    <p class="texto-suave">
+      Lista de participantes aprobados por protocolo, con fecha de expedición y
+      código de verificación. Documento de uso interno de la coordinación.
+    </p>
+  </section>
+
+  <section class="tarjeta" id="cajaAcceso">
+    <h2>Ingreso con código de acceso</h2>
+    <p class="texto-suave texto-peq">
+      Esta página requiere el código que entrega la coordinación de capacitación.
+      El código se valida en el servidor y no queda guardado en el navegador.
+    </p>
+    <div class="verificar-form">
+      <div class="campo">
+        <label for="inpClave">Código de acceso</label>
+        <input type="password" id="inpClave" placeholder="Código institucional" autocomplete="off">
+      </div>
+      <button type="button" class="btn btn-bloque" id="btnEntrar">Consultar registro</button>
+      <div id="salidaAcceso" class="mt-1"></div>
+    </div>
+  </section>
+
+  <div id="zonaRegistro" class="oculto"></div>
+
+</main>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/preguntas.js"></script>
+<script src="assets/js/contenido.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/registro.js"></script>
+</body>
+</html>

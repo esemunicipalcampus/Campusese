@@ -1,0 +1,12 @@
+# PDFs originales escaneados: la web usa las versiones optimizadas de assets/pdf/
+*.pdf
+!assets/pdf/*.pdf
+
+# Imágenes temporales y archivos del editor
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Node / herramientas locales
+node_modules/
+package-lock.json

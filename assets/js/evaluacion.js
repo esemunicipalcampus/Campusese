@@ -1,7 +1,8 @@
 /* =========================================================================
- * MOTOR DE EVALUACIÓN
- * Evaluación tipo formulario: agrupa por tema, mezcla las opciones,
- * calcula el resultado y lo guarda con su código de certificado.
+ * EVALUACIÓN DE UN PROTOCOLO
+ * Cada protocolo tiene su propio cuestionario, sus propios intentos y
+ * su propio certificado.
+ *   evaluacion.html?p=codigo-azul
  * ========================================================================= */
 (function () {
   "use strict";
@@ -19,57 +20,97 @@
   const LETRAS = ["A", "B", "C", "D", "E", "F"];
 
   /* ---------------------------------------------------------------- */
-  /* Estado                                                           */
+  /* Protocolo de esta página                                           */
   /* ---------------------------------------------------------------- */
+
+  const idProtocolo =
+    new URLSearchParams(location.search).get("p") ||
+    sessionStorage.getItem("ese_protocolo") ||
+    "";
+
+  const P = A.protocolo(idProtocolo);
+
+  if (!P) {
+    zona.innerHTML =
+      '<div class="tarjeta"><div class="vacio">'
+      + '<span class="icono">🧭</span>'
+      + '<h2>Protocolo no encontrado</h2>'
+      + '<p class="texto-suave">Elige un protocolo para presentar su evaluación.</p>'
+      + '<div class="acciones-resultado">'
+      + '<a class="btn btn-azul" href="protocolos.html">Ver protocolos</a>'
+      + '</div></div></div>';
+    if (barra) barra.style.width = "0%";
+    if (txtBarra) txtBarra.textContent = "—";
+    if (meta) meta.textContent = "";
+    if (acciones) acciones.innerHTML = '<a class="btn btn-borde" href="protocolos.html">Volver</a>';
+    return;
+  }
+
+  sessionStorage.setItem("ese_protocolo", P.id);
+  document.title = "Evaluación · " + P.nombre + " | ESE Municipal × Unillanos";
+
+  const h1 = document.getElementById("evalTitulo");
+  if (h1) h1.textContent = "Evaluación · " + P.nombre;
+
+  /* ---------------------------------------------------------------- */
+  /* Estado                                                            */
+  /* ---------------------------------------------------------------- */
+
   let preguntas = [];
   let respuestas = {};
   let enviados = false;
-  let borradorGuardado = false;
 
-  const semilla = A.hash(U.correo + (U.sub || "") + new Date().toISOString().slice(0, 10));
+  const claveBorrador = "ese_borrador_" + P.id + "_" + U.correo;
+  const semilla = A.hash(U.correo + P.id + (U.sub || "") +
+    new Date().toISOString().slice(0, 10));
 
   function preparar() {
-    preguntas = window.BancoPreguntas.aplanar().map(function (p) {
-      const b = window.BancoPreguntas.barajarOpciones(p.opciones, p.correcta, A.hash(p.ref + semilla));
-      return {
-        ref: p.ref,
-        temaId: p.temaId,
-        temaNumero: p.temaNumero,
-        temaTitulo: p.temaTitulo,
-        enunciado: p.enunciado,
-        opciones: b.opciones,
-        correcta: b.correcta,
-        explicacion: p.explicacion
-      };
-    });
+    preguntas = window.BancoPreguntas.aplanar()
+      .filter(function (p) { return (P.temas || []).includes(p.temaId); })
+      .map(function (p) {
+        const b = window.BancoPreguntas.barajarOpciones(
+          p.opciones, p.correcta, A.hash(p.ref + semilla)
+        );
+        return {
+          ref: p.ref,
+          temaId: p.temaId,
+          temaNumero: p.temaNumero,
+          temaTitulo: p.temaTitulo,
+          enunciado: p.enunciado,
+          opciones: b.opciones,
+          correcta: b.correcta,
+          explicacion: p.explicacion
+        };
+      });
     respuestas = {};
   }
 
   function recuperarBorrador() {
-    const b = A.BD.leer("ese_borrador_" + U.correo, null);
+    const b = A.BD.leer(claveBorrador, null);
     if (!b || !b.respuestas) return;
     const validas = {};
     for (const ref in b.respuestas) {
-      if (preguntas.some(p => p.ref === ref)) validas[ref] = b.respuestas[ref];
+      if (preguntas.some(function (p) { return p.ref === ref; })) {
+        validas[ref] = b.respuestas[ref];
+      }
     }
     if (Object.keys(validas).length) respuestas = validas;
   }
 
-  /* Guarda el borrador en el navegador.
-     Se llama en cada cambio de respuesta para no perder el avance
-     si el participante cierra o recarga la página a mitad del intento. */
+  /** Guarda el borrador en cada cambio para no perder el avance. */
   function guardarBorrador() {
-    A.BD.escribir("ese_borrador_" + U.correo, {
+    A.BD.escribir(claveBorrador, {
+      protocolo: P.id,
       respuestas: respuestas,
       semilla: semilla,
       ts: new Date().toISOString()
     });
-    borradorGuardado = true;
   }
 
   /* ---------------------------------------------------------------- */
-  /* Cálculo                                                          */
+  /* Cálculo                                                           */
   /* ---------------------------------------------------------------- */
+
   function calcular() {
     let aciertos = 0;
     let contestadas = 0;
@@ -85,68 +126,83 @@
 
       if (!porTema[p.temaId]) {
         porTema[p.temaId] = {
-          id: p.temaId, numero: p.temaNumero, titulo: p.temaTitulo, total: 0, aciertos: 0
+          id: p.temaId,
+          numero: p.temaNumero,
+          titulo: p.temaTitulo,
+          aciertos: 0,
+          total: 0,
+          detalle: []
         };
       }
-      porTema[p.temaId].total++;
-      if (ok) porTema[p.temaId].aciertos++;
+      const t = porTema[p.temaId];
+      t.total++;
+      if (ok) t.aciertos++;
 
-      detalle.push({
+      t.detalle.push({
         ref: p.ref,
+        temaId: p.temaId,
         temaNumero: p.temaNumero,
         enunciado: p.enunciado,
         opciones: p.opciones,
-        elegida: contestada ? r : null,
         correcta: p.correcta,
-        explicacion: p.explicacion,
-        acierto: ok
+        elegida: contestada ? r : null,
+        acierto: ok,
+        explicacion: p.explicacion
       });
     });
 
     const total = preguntas.length;
     const porcentaje = total === 0 ? 0 : Math.round((aciertos / total) * 100);
+
     const temas = Object.keys(porTema).map(function (k) {
       const t = porTema[k];
       t.porcentaje = t.total === 0 ? 0 : Math.round((t.aciertos / t.total) * 100);
+      t.aprobado = t.porcentaje >= C.programa.notaAprobacion;
       return t;
-    });
+    }).sort(function (a, b) { return a.numero - b.numero; });
 
-    const aprobadoTemas = temas.every(function (t) { return t.porcentaje >= C.curso.notaPorTema; });
-    const aprobado = porcentaje >= C.curso.notaAprobacion && aprobadoTemas;
+    const notaMinima = C.programa.notaAprobacion;
+    const notaMinimaTema = notaMinima;
+
+    const totalTemasAprobados = temas.every(function (t) { return t.aprobado; });
+    const aprobado = porcentaje >= notaMinima && totalTemasAprobados;
 
     return {
-      total: total,
+      protocolo: P.id,
+      protocoloNombre: P.nombre,
+      protocoloNumero: P.numero,
+      temas: temas,
+      detalle: temas.reduce(function (acc, t) { return acc.concat(t.detalle); }, []),
       aciertos: aciertos,
+      total: total,
       contestadas: contestadas,
       porcentaje: porcentaje,
-      temas: temas,
+      notaMinima: notaMinima,
+      notaMinimaTema: notaMinimaTema,
+      aprobadoTemas: totalTemasAprobados,
       aprobado: aprobado,
-      aprobadoTemas: aprobadoTemas,
-      notaMinima: C.curso.notaAprobacion,
-      notaMinimaTema: C.curso.notaPorTema,
-      detalle: detalle,
-      fecha: new Date().toISOString()
+      fecha: A.iso(new Date())
     };
   }
 
   /* ---------------------------------------------------------------- */
-  /* Pintado                                                          */
+  /* Pintado                                                           */
   /* ---------------------------------------------------------------- */
+
   function htmlInstrucciones() {
     return ''
       + '<div class="tarjeta">'
       + '  <h2>Instrucciones</h2>'
       + '  <ol class="pasos">'
       + '    <li>Responde todas las preguntas antes de enviar.</li>'
-      + '    <li>Las preguntas están agrupadas por tema y el orden de las opciones cambia en cada intento.</li>'
-      + '    <li>Necesitas <strong>' + C.curso.notaAprobacion + '% o más</strong> en total y al menos '
-      + C.curso.notaPorTema + '% en cada tema para aprobar.</li>'
-      + '    <li>Al enviar verás el resultado inmediato con la justificación de cada respuesta.</li>'
-      + '    <li>Si apruebas, se emite tu certificado de inmediato.</li>'
+      + '    <li>El orden de las opciones cambia en cada intento.</li>'
+      + '    <li>Necesitas <strong>' + C.programa.notaAprobacion + '% o más</strong> para aprobar.</li>'
+      + '    <li>Dispones de <strong>' + C.programa.intentosMaximos + ' intentos</strong>.</li>'
+      + '    <li>Si apruebas, se emite tu certificado de este protocolo.</li>'
       + '  </ol>'
       + '  <div class="aviso aviso-info"><strong>Tiempo</strong>'
-      + '    Puedes responder sin límite de tiempo. Las respuestas quedan guardadas en esta página '
-      + '    mientras no la recargues.</div>'
+      + '    No hay límite de tiempo. Las respuestas quedan guardadas en esta página '
+      + '    mientras no cierres el navegador.</div>'
       + '</div>';
   }
 
@@ -234,7 +290,7 @@
     zona.innerHTML = html;
 
     acciones.innerHTML = enviados
-      ? '<a class="btn btn-azul" href="resultado.html">Ver resultado</a>'
+      ? '<a class="btn btn-azul" href="resultado.html?p=' + encodeURIComponent(P.id) + '">Ver resultado</a>'
       : '<button type="button" class="btn btn-borde btn-medio" id="btnReiniciar">Reiniciar</button>';
 
     if (!enviados) {
@@ -253,13 +309,13 @@
 
       const btn = document.getElementById("btnEnviar");
       if (btn) btn.addEventListener("click", enviar);
+
       const btnR = document.getElementById("btnReiniciar");
       if (btnR) {
         btnR.addEventListener("click", function () {
           if (!confirm("¿Deseas borrar todas tus respuestas y empezar de nuevo?")) return;
           respuestas = {};
-          borradorGuardado = false;
-          A.BD.borrar("ese_borrador_" + U.correo);
+          A.BD.borrar(claveBorrador);
           pintar();
           window.scrollTo({ top: 0 });
         });
@@ -284,15 +340,14 @@
         : "Faltan " + (total - n) + " pregunta" + (total - n === 1 ? "" : "s") + " por responder.";
     }
 
-    meta.textContent = preguntas.length + " preguntas · "
-      + window.TEMAS.length + " temas · aprobación "
-      + C.curso.notaAprobacion + "% (mínimo "
-      + C.curso.notaPorTema + "% por tema)";
+    meta.textContent = P.nombre + " · " + preguntas.length + " preguntas · "
+      + "aprobación " + C.programa.notaAprobacion + "%";
   }
 
   /* ---------------------------------------------------------------- */
-  /* Envío                                                            */
+  /* Envío                                                             */
   /* ---------------------------------------------------------------- */
+
   function enviar() {
     const total = preguntas.length;
     const n = Object.keys(respuestas).length;
@@ -313,15 +368,12 @@
     }
 
     const resultado = calcular();
-    const intentosPrevios = A.obtenerResultados(U.correo).length;
-
-    resultado.intento = intentosPrevios + 1;
+    resultado.intento = intentosHechos() + 1;
     resultado.codigo = A.generarCodigo(U.correo, resultado);
-    resultado.ultimoIntento = resultado.intento >= C.curso.intentosMaximos;
+    resultado.ultimoIntento = resultado.intento >= C.programa.intentosMaximos;
 
     A.guardarResultado(U.correo, resultado);
-    A.BD.borrar("ese_borrador_" + U.correo);
-    sessionStorage.setItem("ese_ultimo_codigo", resultado.codigo);
+    A.BD.borrar(claveBorrador);
 
     enviados = true;
 
@@ -330,10 +382,10 @@
       codigo: resultado.codigo,
       correo: U.correo,
       nombre: registro.nombre || U.nombre,
-      documento: registro.documento || "",
       cargo: registro.cargo || "",
-      servicio: registro.servicio || "",
-      centro: registro.centro || "",
+      sede: registro.sede || "",
+      protocolo: P.id,
+      protocoloNombre: P.nombre,
       intento: resultado.intento,
       fecha: resultado.fecha,
       porcentaje: resultado.porcentaje,
@@ -351,82 +403,87 @@
     pintar();
     window.scrollTo({ top: 0, behavior: "smooth" });
 
+    if (!resultado.aprobado && !resultado.ultimoIntento) {
+      acciones.innerHTML =
+        '<button type="button" class="btn btn-borde btn-medio" id="btnReintentar">Intentar de nuevo</button>'
+        + ' <a class="btn btn-azul" href="resultado.html?p=' + encodeURIComponent(P.id) + '">Ver resultado</a>';
+      const btnReintentar = document.getElementById("btnReintentar");
+      if (btnReintentar) {
+        btnReintentar.addEventListener("click", function () {
+          location.href = "evaluacion.html?p=" + encodeURIComponent(P.id);
+        });
+      }
+    }
+
     if (resultado.aprobado) {
+      A.aviso("¡Felicitaciones! Aprobaste " + P.nombre + " con " + resultado.porcentaje
+        + " %. Abriendo tu reconocimiento…", "ok", 5000);
       setTimeout(function () {
-        alert("Felicitaciones. Aprobaste la evaluación.\n\nPuedes descargar tu certificado.");
-        location.href = "certificado.html?codigo=" + encodeURIComponent(resultado.codigo);
-      }, 400);
+        location.href = "certificado.html?p=" + encodeURIComponent(P.id)
+          + "&codigo=" + encodeURIComponent(resultado.codigo);
+      }, 2200);
+    } else {
+      A.aviso("No alcanzaste el " + C.programa.notaAprobacion + " % en " + P.nombre
+        + ". Obtuviste " + resultado.porcentaje + " %. Revisa las explicaciones e inténtalo de nuevo.",
+        "error", 7000);
     }
   }
 
   /* ---------------------------------------------------------------- */
-  /* Arranque                                                         */
-  /* ---------------------------------------------------------------- */
-  preparar();
-  recuperarBorrador();
-  // Si ya no puede intentar (aprobó o agotó intentos), se muestra el aviso
-  // en lugar del cuestionario: no se llama a pintar().
-  if (!bloquearSiNoPuedeIntentar()) pintar();
-
-  /* ---------------------------------------------------------------- */
-  /* Control de intentos                                              */
+  /* Control de intentos                                               */
   /* ---------------------------------------------------------------- */
 
-  /** Intentos ya realizados por este participante. */
-  function intentosHechos() {
-    return A.obtenerResultados(U.correo).length;
-  }
+  function intentosHechos() { return A.intentosProtocolo(U.correo, P.id); }
 
-  /** ¿Ya aprobó en algún intento? */
-  function aprobadoAntes() {
-    return A.obtenerResultados(U.correo).some(function (r) { return r.aprobado; });
-  }
-
-  /**
-   * Impide repetir la evaluación cuando ya se agotaron los intentos
-   * o cuando el participante ya obtuvo su certificado.
-   */
   function bloquearSiNoPuedeIntentar() {
     const previos = intentosHechos();
 
-    if (aprobadoAntes()) {
-      zona.innerHTML = ""
-        + '<div class="tarjeta"><div class="vacio">'
+    if (A.aproboProtocolo(U.correo, P.id)) {
+      zona.innerHTML =
+        '<div class="tarjeta"><div class="vacio">'
         + '<span class="icono">✅</span>'
-        + '<h2>Ya aprobaste esta evaluación</h2>'
-        + '<p class="texto-suave">Tu certificado ya está disponible. '
-        + 'La evaluación no puede repetirse una vez aprobada.</p>'
+        + '<h2>Ya aprobaste este protocolo</h2>'
+        + '<p class="texto-suave">Tu reconocimiento de ' + A.esc(P.nombre)
+        + ' ya está disponible. No se puede repetir una evaluación aprobada.</p>'
         + '<div class="acciones-resultado">'
-        + '<a class="btn btn-azul" href="certificado.html">Ver mi certificado</a>'
-        + '<a class="btn btn-borde" href="resultado.html">Ver mi resultado</a>'
+        + '<a class="btn btn-azul" href="certificado.html?p=' + encodeURIComponent(P.id) + '">Ver mi reconocimiento</a>'
+        + '<a class="btn btn-borde" href="resultado.html?p=' + encodeURIComponent(P.id) + '">Ver mi resultado</a>'
         + '</div></div></div>';
       if (barra) barra.style.width = "100%";
       if (txtBarra) txtBarra.textContent = "Completada";
-      if (meta) meta.textContent = "Evaluación aprobada";
-      if (acciones) acciones.innerHTML = '<a class="btn btn-borde" href="curso.html">Volver al curso</a>';
+      if (meta) meta.textContent = P.nombre + " · aprobado";
+      if (acciones) acciones.innerHTML = '<a class="btn btn-borde" href="protocolos.html">Ver protocolos</a>';
       return true;
     }
 
-    if (previos >= C.curso.intentosMaximos) {
-      zona.innerHTML = ""
-        + '<div class="tarjeta"><div class="vacio">'
+    if (previos >= C.programa.intentosMaximos) {
+      zona.innerHTML =
+        '<div class="tarjeta"><div class="vacio">'
         + '<span class="icono">🔒</span>'
-        + '<h2>Agotaste los ' + C.curso.intentosMaximos + ' intentos</h2>'
-        + '<p class="texto-suave">Alcanzaste el número máximo de intentos permitido '
-        + '(' + previos + ' de ' + C.curso.intentosMaximos + ') sin alcanzar la nota mínima. '
-        + 'Comunícate con la coordinación de capacitación para recibir orientación '
-        + 'antes de presentar una nueva evaluación.</p>'
+        + '<h2>Agotaste los ' + C.programa.intentosMaximos + ' intentos</h2>'
+        + '<p class="texto-suave">Alcanzaste el número máximo de intentos para '
+        + A.esc(P.nombre) + ' (' + previos + ' de ' + C.programa.intentosMaximos
+        + ') sin alcanzar la nota mínima. Comunícate con la coordinación de '
+        + 'capacitación para recibir orientación antes de presentar de nuevo.</p>'
         + '<div class="acciones-resultado">'
-        + '<a class="btn btn-borde" href="resultado.html">Revisar mis intentos</a>'
-        + '<a class="btn btn-borde" href="curso.html">Repasar el curso</a>'
+        + '<a class="btn btn-borde" href="resultado.html?p=' + encodeURIComponent(P.id) + '">Revisar mis intentos</a>'
+        + '<a class="btn btn-borde" href="protocolos.html">Volver a los protocolos</a>'
         + '</div></div></div>';
       if (barra) barra.style.width = "100%";
       if (txtBarra) txtBarra.textContent = "Intentos agotados";
-      if (meta) meta.textContent = "Sin intentos disponibles";
-      if (acciones) acciones.innerHTML = '<a class="btn btn-borde" href="curso.html">Volver al curso</a>';
+      if (meta) meta.textContent = P.nombre + " · sin intentos disponibles";
+      if (acciones) acciones.innerHTML = '<a class="btn btn-borde" href="protocolos.html">Volver</a>';
       return true;
     }
 
     return false;
   }
+
+  /* ---------------------------------------------------------------- */
+  /* Arranque                                                          */
+  /* ---------------------------------------------------------------- */
+
+  preparar();
+  recuperarBorrador();
+  if (!bloquearSiNoPuedeIntentar()) pintar();
 })();
