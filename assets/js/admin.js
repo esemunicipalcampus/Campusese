@@ -116,7 +116,25 @@
   function pintar() {
     const filas = (datos && datos.participantes) || [];
 
-    const resumen = `
+    /* Cifras reales del curso, leidas de la misma fuente que usa el sitio.
+       No van escritas a mano para que no se desactualicen. */
+    const protocolos = (C.protocolos || []).length;
+    const modulos = (window.CURSO && window.CURSO.modulos) ? window.CURSO.modulos.length : 0;
+    const temas = window.TEMAS ? window.TEMAS.length : 0;
+    const preguntas = window.BancoPreguntas ? window.BancoPreguntas.total() : 0;
+    const horas = (C.protocolos || []).reduce((s, p) => s + Number(p.horas || 0), 0);
+
+    const contenido = `
+      <h2 class="admin-seccion">Contenido del curso</h2>
+      <div class="contenido-curso">
+        <div class="cc cc-azul"><span class="cc-num">${A.esc(protocolos)}</span><span class="cc-txt">Protocolos</span></div>
+        <div class="cc cc-magenta"><span class="cc-num">${A.esc(modulos)}</span><span class="cc-txt">Módulos de estudio</span></div>
+        <div class="cc cc-verde"><span class="cc-num">${A.esc(temas)}</span><span class="cc-txt">Temas de evaluación</span></div>
+        <div class="cc cc-amarillo"><span class="cc-num">${A.esc(preguntas)}</span><span class="cc-txt">Preguntas</span></div>
+        <div class="cc cc-cian"><span class="cc-num">${A.esc(horas)} h</span><span class="cc-txt">Duración total</span></div>
+      </div>
+
+      <h2 class="admin-seccion">Actividad de los participantes</h2>
       <div class="datos-curso" style="margin:.6rem 0 1rem">
         <div class="dato"><strong>${filas.length}</strong><span>Participantes</span></div>
         <div class="dato"><strong>${(datos && datos.aprobados) || 0}</strong><span>Protocolos aprobados</span></div>
@@ -182,7 +200,7 @@
           <h1 style="margin:0">Panel administrativo</h1>
           <button type="button" class="btn btn-borde" id="btnSalirAdmin">Salir</button>
         </div>
-        ${resumen}
+        ${contenido}
         <div class="campo">
           <label for="buscarAdmin">Buscar por nombre, correo o cargo</label>
           <input type="search" id="buscarAdmin" placeholder="Escribe para filtrar…">

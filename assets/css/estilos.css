@@ -599,6 +599,10 @@ table.datos td:first-child { font-weight: 600; color: var(--verde-oscuro); }
   .portada h1 { font-size: 1.75rem; margin-bottom: 1.4rem; }
   .portada-acciones { flex-direction: column; align-items: stretch; }
   .portada-acciones .btn { width: 100%; }
+  .contenido-curso { grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: .55rem; }
+  .cc { padding: .8rem .65rem; }
+  .cc-num { font-size: 1.35rem; }
+  .cc-txt { font-size: .62rem; }
   .marca .separador { display: none; }
   .indice-modulos { grid-template-columns: 1fr; }
   .navegacion-modulos { flex-direction: column; }
@@ -670,6 +674,38 @@ table.datos td:first-child { font-weight: 600; color: var(--verde-oscuro); }
 /* =========================================================================
    PANEL ADMINISTRATIVO
    ========================================================================= */
+
+.admin-seccion {
+  font-size: .74rem; font-weight: 700; letter-spacing: .9px;
+  text-transform: uppercase; color: var(--texto-suave);
+  margin: 1.4rem 0 .1rem; padding-bottom: .3rem;
+  border-bottom: 2px solid var(--verde-claro);
+}
+.admin-seccion:first-of-type { margin-top: 1.2rem; }
+
+/* Cifras del contenido del curso, cada una con su color */
+.contenido-curso {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: .7rem; margin: .8rem 0 .4rem;
+}
+.cc {
+  position: relative; overflow: hidden;
+  border-radius: var(--radio); padding: .95rem .85rem .85rem;
+  color: #fff; box-shadow: var(--sombra);
+  border-left: 5px solid rgba(255, 255, 255, .55);
+  transition: transform .15s, box-shadow .15s;
+}
+.cc:hover { transform: translateY(-2px); box-shadow: var(--sombra-f); }
+.cc-num { display: block; font-size: 1.65rem; font-weight: 700; line-height: 1.05; text-shadow: 0 1px 6px rgba(9, 24, 45, .25); }
+.cc-txt {
+  display: block; margin-top: .25rem; font-size: .7rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .5px; color: rgba(255, 255, 255, .92);
+}
+.cc-azul    { background: linear-gradient(135deg, #1B3A6B, #306090); }
+.cc-magenta { background: linear-gradient(135deg, #8E1F45, #C03060); }
+.cc-verde   { background: linear-gradient(135deg, #14614A, #1B9A6B); }
+.cc-amarillo{ background: linear-gradient(135deg, #8A5A00, #E0C000); }
+.cc-cian    { background: linear-gradient(135deg, #1B5F7A, #2C8FAD); }
 
 .admin-persona {
   border: 1px solid var(--borde); border-radius: var(--radio);
