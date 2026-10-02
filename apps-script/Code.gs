@@ -3,8 +3,15 @@
  *  ESE MUNICIPAL DE VILLAVICENCIO × UNIVERSIDAD DE LOS LLANOS
  *  Backend de los protocolos de seguridad del paciente — Google Apps Script
  * -------------------------------------------------------------------------
- *  Guarda el registro de participantes, los resultados por PROTOCOLO y los
- *  certificados emitidos, y alimenta el registro institucional interno.
+ *  Guarda participantes, resultados por PROTOCOLO, el avance de lectura
+ *  sección por sección y el tiempo de estudio en cada módulo, y alimenta
+ *  el registro institucional y el panel administrativo.
+ *
+ *  IMPORTANTE — SEGURIDAD DEL PANEL:
+ *    La contraseña maestra del panel (CLAVE_ADMIN) vive SOLO aquí, en el
+ *    servidor. Nunca se escribe en un archivo del sitio: si estuviera en
+ *    el navegador, cualquier persona podría leerla con "ver código fuente".
+ *    Cámbiala antes de poner la página en producción.
  *
  *  INSTALACIÓN (5 minutos):
  *    1. Abre https://script.google.com  → "Nuevo proyecto"
@@ -18,10 +25,7 @@
  *         · Quién tiene acceso:  Cualquier persona
  *    6. Copia la URL que termina en /exec y pégala en
  *       CONFIG.appsScriptUrl  (archivo assets/js/config.js)
- *    7. En  CLAVE  (abajo) pon una contraseña larga para el registro
- *       institucional: es la que se escribe en registro.html.
- *    8. Opcional: pon la MISMA contraseña en CONFIG.appsScriptSecret para
- *       que solo tu sitio pueda escribir en la hoja.
+ *    7. Pon el mismo valor en  CLAVE  y en  CONFIG.appsScriptSecret.
  * =========================================================================
  */
 
@@ -32,10 +36,24 @@
 /** Código de acceso del registro institucional (registro.html). */
 var CLAVE = "CLAVE_SECRETA_LARGA_Y_UNICA_AQUI";
 
+/** Contraseña MAESTRA del panel administrativo (admin.html).
+ *  Se compara aquí, en el servidor, nunca en el navegador.
+ *  Está escrita a mano como pidió la institución, pero al vivir en un
+ *  repositorio NO es secreta: cámbiala por una larga y aleatoria antes de
+ *  publicar, o léela de PropertiesService (ver leerClaveAdmin). */
+var CLAVE_ADMIN = "130004708";
+
+/** Sesiones de panel abiertas: token → hora de creación (en milisegundos). */
+var SESIONES_ADMIN = {};
+var DURACION_SESION_ADMIN_MS = 8 * 60 * 60 * 1000; // 8 horas
+
 /** Nombres de las pestañas de la hoja de cálculo. */
 var HOJA_REGISTRO = "Participantes";
 var HOJA_RESULTADOS = "Resultados";
-var HOJA_CERTIFICADOS = "Certificados";
+var HOJA_PROGRESO = "Progreso";
+
+/** Cuántos protocolos tiene el programa (para el resumen del panel). */
+var TOTAL_PROTOCOLOS = 4;
 
 /** Nombre del archivo de hoja de cálculo. Se crea si no existe. */
 var NOMBRE_SPREADSHEET = "Registro Protocolos ESE - ESE Villavicencio";
@@ -45,7 +63,8 @@ var MODO_RESPUESTA = "json";
 
 /** Encabezados de cada hoja (el orden define los índices). */
 var COLUMNAS_REGISTRO = [
-  "Fecha registro", "Correo", "Nombre", "Sede", "Cargo", "Correo verificado"
+  "Fecha registro", "Correo", "Nombre", "Sede", "Cargo",
+  "Dependencia", "Se dedica a", "Teléfono", "Horario", "Observaciones"
 ];
 
 var COLUMNAS_RESULTADOS = [
@@ -54,10 +73,9 @@ var COLUMNAS_RESULTADOS = [
   "Aprobado", "Temas"
 ];
 
-var COLUMNAS_CERTIFICADOS = [
-  "Código", "Fecha expedición", "Nombre", "Correo", "Sede", "Cargo",
-  "Protocolo", "Protocolo (nombre)",
-  "Intento", "Aciertos", "Total", "Porcentaje", "Temas"
+var COLUMNAS_PROGRESO = [
+  "Fecha", "Correo", "Nombre", "Módulo", "Módulo (título)",
+  "Secciones realizadas", "Secciones totales", "Tiempo (segundos)"
 ];
 
 /* --------------------------------------------------------------------
@@ -76,19 +94,11 @@ function doPost(e) {
 }
 
 function doGet(e) {
-  // Consulta pública por URL:
-  //   ?accion=consulta&codigo=ESE-VLL-2026-CAUZ-000123
-  var p = (e && e.parameter) || {};
-  var salida;
-  try {
-    salida = manejar({
-      accion: p.accion || "consulta",
-      datos: { codigo: (p.codigo || "").toUpperCase() }
-    });
-  } catch (err) {
-    salida = { ok: false, error: String(err) };
-  }
-  return responder(salida);
+  // Solo se permite consultar por GET: el resto se hace por POST.
+  return responder({
+    ok: false,
+    error: "Usa POST. El acceso al panel y al registro es por envío de datos."
+  });
 }
 
 function responder(objeto) {
@@ -112,14 +122,18 @@ function manejar(payload) {
   var accion = String(payload.accion || "").toLowerCase();
   var datos = payload.datos || {};
 
-  // Verificación de certificados: pública, para que cualquiera valide.
-  if (accion === "consulta") return consultarCodigo(datos);
+  /* ---------------- Panel administrativo ----------------
+     Estas tres acciones NO exigen la clave del sitio: se validan con la
+     contraseña maestra y, después, con el token de sesión. */
+  if (accion === "adminentrar") return adminEntrar(datos);
+  if (accion === "adminprogreso") return adminProgreso(datos);
+  if (accion === "adminborrar") return adminBorrar(datos);
 
   // Registro institucional: pide el código de acceso, no la clave del sitio.
   if (accion === "registrointerno") return listarAprobados(datos);
 
   // El resto exige la clave compartida del sitio.
-  if (CLAVE && CLAVE !== "CAMBIA_ESTA_CLAVE" && payload.clave !== CLAVE) {
+  if (CLAVE && CLAVE !== "CLAVE_SECRETA_LARGA_Y_UNICA_AQUI" && payload.clave !== CLAVE) {
     return { ok: false, error: "Clave incorrecta" };
   }
 
@@ -128,6 +142,10 @@ function manejar(payload) {
       return registrarParticipante(datos);
     case "resultado":
       return registrarResultado(datos);
+    case "progreso":
+      return registrarProgreso(datos);
+    case "tiempo":
+      return registrarTiempo(datos);
     case "listado":
       return listarParticipantes();
     default:
@@ -152,10 +170,14 @@ function registrarParticipante(d) {
   var registro = [
     new Date(d.registro || d.fecha || ahora),
     d.correo || "",
-    d.nombre || d.googleNombre || "",
+    d.nombre || d.nombreMostrado || d.googleNombre || "",
     d.sede || "",
     d.cargo || "",
-    d.emailVerified ? "Sí" : (d.correoVerificado ? "Sí" : "No")
+    d.dependencia || "",
+    d.profesion || "",
+    d.telefono || "",
+    d.horario || "",
+    d.observaciones || ""
   ];
 
   if (fila > 0) {
@@ -176,11 +198,11 @@ function registrarResultado(d) {
   var hoja = ss.getSheetByName(HOJA_RESULTADOS);
   asegurarEncabezados(hoja, COLUMNAS_RESULTADOS);
 
-  hoja.appendRow([
+hoja.appendRow([
     new Date(),
     codigo,
     correo,
-d.nombre || "",
+    d.nombre || "",
     d.sede || "",
     d.cargo || "",
     d.protocolo || "",
@@ -193,31 +215,89 @@ d.nombre || "",
     resumenTemas(d.temas)
   ]);
 
-  // Solo los aprobados generan certificado, y solo una vez por código.
-  if (d.aprobado) {
-    var hc = ss.getSheetByName(HOJA_CERTIFICADOS);
-    asegurarEncabezados(hc, COLUMNAS_CERTIFICADOS);
+  return { ok: true, codigo: codigo };
+}
 
-    if (buscarFilaPorColumna(hc, codigo, 1) === 0) {
-      hc.appendRow([
-        codigo,
-        new Date(),
-        d.nombre || "",
-        correo,
-        d.sede || "",
-        d.cargo || "",
-        d.protocolo || "",
-        d.protocoloNombre || "",
-        d.intento || 1,
-        d.aciertos || 0,
-        d.total || 0,
-        d.porcentaje || 0,
-        resumenTemas(d.temas)
-      ]);
-    }
+/* --------------------------------------------------------------------
+ * AVANCE DE LECTURA Y TIEMPO DE ESTUDIO
+ * ------------------------------------------------------------------ */
+
+/** Una fila por módulo y persona: secciones leídas y tiempo acumulado. */
+function registrarProgreso(d) {
+  var correo = normalizar(d.correo);
+  if (!correo) return { ok: false, error: "Falta el correo" };
+
+  var ss = obtenerSpreadsheet();
+  var hoja = ss.getSheetByName(HOJA_PROGRESO);
+  asegurarEncabezados(hoja, COLUMNAS_PROGRESO);
+
+  var modulo = String(d.modulo || "");
+  var fila = buscarFilaProgreso(hoja, correo, modulo);
+
+  var valores = [
+    new Date(),
+    correo,
+    d.nombre || "",
+    modulo,
+    d.titulo || "",
+    String(d.secciones || ""),
+    d.totalSecciones || 0,
+    Math.max(0, Math.round(Number(d.tiempo) || 0))
+  ];
+
+  if (fila > 0) {
+    hoja.getRange(fila, 1, 1, valores.length).setValues([valores]);
+  } else {
+    hoja.appendRow(valores);
+  }
+  return { ok: true, correo: correo, modulo: modulo };
+}
+
+/** El tiempo llega desde el cronómetro del navegador. */
+function registrarTiempo(d) {
+  var correo = normalizar(d.correo);
+  if (!correo) return { ok: false, error: "Falta el correo" };
+
+  var segundos = Math.max(0, Math.round(Number(d.segundos) || 0));
+  var total = Math.max(0, Math.round(Number(d.total) || 0));
+  if (segundos === 0 && total === 0) return { ok: true, correo: correo, acumulado: 0 };
+
+  var ss = obtenerSpreadsheet();
+  var hoja = ss.getSheetByName(HOJA_PROGRESO);
+  asegurarEncabezados(hoja, COLUMNAS_PROGRESO);
+
+  var modulo = String(d.modulo || "");
+  var fila = buscarFilaProgreso(hoja, correo, modulo);
+
+  if (fila === 0) {
+    hoja.appendRow([
+      new Date(), correo, d.nombre || "", modulo, d.titulo || "", "0", 0, total
+    ]);
+    return { ok: true, correo: correo, acumulado: total };
   }
 
-  return { ok: true, codigo: codigo };
+  // El navegador manda el total ya acumulado (incluye este tramo). Se conserva
+  // el mayor entre lo que había en la hoja y lo que llega, para que un reloj
+  // que va atrás no borre lo recorrido. Si el total no viniera, se suma el tramo.
+  var previo = Number(hoja.getRange(fila, 8).getValue()) || 0;
+  var acumulado = total > 0 ? Math.max(previo, total) : previo + segundos;
+  hoja.getRange(fila, 8).setValue(acumulado);
+  hoja.getRange(fila, 1).setValue(new Date());
+
+  return { ok: true, correo: correo, acumulado: acumulado };
+}
+
+/** Busca la fila de (correo, módulo) en la hoja de progreso. */
+function buscarFilaProgreso(hoja, correo, modulo) {
+  var ultima = hoja.getLastRow();
+  if (ultima < 2) return 0;
+  var valores = hoja.getRange(2, 1, ultima - 1, 4).getValues();
+  for (var i = 0; i < valores.length; i++) {
+    var c = normalizar(valores[i][1]);
+    var m = String(valores[i][3]).trim();
+    if (c === correo && m === String(modulo).trim()) return i + 2;
+  }
+  return 0;
 }
 
 /**
@@ -232,12 +312,12 @@ function listarAprobados(d) {
   if (clave !== CLAVE) return { ok: false, error: "Código de acceso incorrecto" };
 
   var ss = obtenerSpreadsheet();
-  var hc = ss.getSheetByName(HOJA_CERTIFICADOS);
-  if (!hc || hc.getLastRow() < 2) {
+  var hr = ss.getSheetByName(HOJA_RESULTADOS);
+  if (!hr || hr.getLastRow() < 2) {
     return { ok: true, total: 0, generados: hoyIso(), registros: [] };
   }
 
-  var filas = hc.getDataRange().getValues().slice(1);
+  var filas = hr.getDataRange().getValues().slice(1);
   var fProtocolo = normalizar(d.protocolo);
   var desde = normalizar(d.desde);
   var hasta = normalizar(d.hasta);
@@ -246,10 +326,10 @@ function listarAprobados(d) {
   var registros = filas
     .map(function (f) {
       return {
-        codigo: f[0],
-        fecha: formatearFechaIso(f[1]),
-        nombre: f[2],
-        correo: f[3],
+        codigo: f[1],
+        fecha: formatearFechaIso(f[0]),
+        nombre: f[3],
+        correo: f[2],
         sede: f[4],
         cargo: f[5],
         protocolo: f[6],
@@ -258,10 +338,12 @@ function listarAprobados(d) {
         aciertos: f[9],
         total: f[10],
         porcentaje: f[11],
-        temas: f[12]
+        aprobado: f[12] === "Sí",
+        temas: f[13]
       };
     })
     .filter(function (r) {
+      if (!r.aprobado) return false;
       if (fProtocolo && normalizar(r.protocolo) !== fProtocolo) return false;
       if (desde && r.fecha < desde) return false;
       if (hasta && r.fecha > hasta) return false;
@@ -291,38 +373,265 @@ function listarAprobados(d) {
   };
 }
 
-function consultarCodigo(d) {
-  var codigo = String(d.codigo || "").toUpperCase().trim();
-  if (!codigo) return { ok: false, error: "Falta el código" };
+/* --------------------------------------------------------------------
+ * PANEL ADMINISTRATIVO
+ * ------------------------------------------------------------------ */
+
+/**
+ * Entrada al panel. Se compara la contraseña maestra AQUÍ, en el servidor,
+ * y se devuelve un token de sesión que el navegador guarda en sessionStorage.
+ */
+function adminEntrar(d) {
+  if (!CLAVE_ADMIN || CLAVE_ADMIN === "CLAVE_SECRETA_LARGA_Y_UNICA_AQUI") {
+    return { ok: false, mensaje: "El backend no tiene contraseña maestra configurada." };
+  }
+  if (String(d.clave || "") !== CLAVE_ADMIN) {
+    return { ok: false, mensaje: "Contraseña incorrecta." };
+  }
+
+  var token = Utilities.getUuid() + Utilities.getUuid().slice(0, 8);
+  cargarSesiones();
+  limpiarSesiones();
+  SESIONES_ADMIN[token] = new Date().getTime();
+  guardarSesiones();
+
+  return { ok: true, token: token, vence: DURACION_SESION_ADMIN_MS / 3600000 };
+}
+
+/** Valida el token de sesión o devuelve un mensaje de error. */
+function revisarToken(token) {
+  if (!token || !SESIONES_ADMIN[token]) return false;
+  var edad = new Date().getTime() - SESIONES_ADMIN[token];
+  if (edad > DURACION_SESION_ADMIN_MS) {
+    delete SESIONES_ADMIN[token];
+    return false;
+  }
+  return true;
+}
+
+/** La hoja de cálculo guarda las sesiones, para que sobrevivan a los reinicios. */
+function cargarSesiones() {
+  try {
+    var cache = CacheService.getScriptCache();
+    var crudo = cache.get("sesiones_admin");
+    if (crudo) SESIONES_ADMIN = JSON.parse(crudo);
+  } catch (e) { /* sin caché: se usa el mapa en memoria */ }
+  return SESIONES_ADMIN;
+}
+
+function guardarSesiones() {
+  try {
+    CacheService.getScriptCache().put(
+      "sesiones_admin", JSON.stringify(SESIONES_ADMIN), DURACION_SESION_ADMIN_MS / 1000
+    );
+  } catch (e) { /* sin caché: las sesiones viven solo en memoria */ }
+}
+
+function limpiarSesiones() {
+  var ahora = new Date().getTime();
+  Object.keys(SESIONES_ADMIN).forEach(function (k) {
+    if (ahora - SESIONES_ADMIN[k] > DURACION_SESION_ADMIN_MS) delete SESIONES_ADMIN[k];
+  });
+}
+
+/**
+ * Todo el progreso de todas las personas: lectura, tiempo por módulo y
+ * notas por protocolo. Es la única acción que requiere contraseña maestra.
+ */
+function adminProgreso(d) {
+  cargarSesiones();
+  if (!revisarToken(d.token)) {
+    return { ok: false, mensaje: "La sesión expiró. Vuelve a entrar." };
+  }
 
   var ss = obtenerSpreadsheet();
-  var hc = ss.getSheetByName(HOJA_CERTIFICADOS);
-  if (!hc) return { ok: true, encontrado: false, codigo: codigo };
+  var porCorreo = {};
 
-  var fila = buscarFilaPorColumna(hc, codigo, 1);
-  if (fila === 0) return { ok: true, encontrado: false, codigo: codigo };
+  /* --- ficha --- */
+  var hr = ss.getSheetByName(HOJA_REGISTRO);
+  if (hr && hr.getLastRow() > 1) {
+    hr.getDataRange().getValues().slice(1).forEach(function (f) {
+      var correo = normalizar(f[1]);
+      if (!correo) return;
+      porCorreo[correo] = porCorreo[correo] || { correo: correo };
+      var p = porCorreo[correo];
+      p.nombre = f[2] || p.nombre || "";
+      p.sede = f[3] || p.sede || "";
+      p.cargo = f[4] || p.cargo || "";
+      p.dependencia = f[5] || p.dependencia || "";
+      p.profesion = f[6] || p.profesion || "";
+      p.telefono = f[7] || p.telefono || "";
+      p.horario = f[8] || p.horario || "";
+      p.observaciones = f[9] || p.observaciones || "";
+      p.fechaRegistro = formatearFechaIso(f[0]);
+    });
+  }
 
-  var v = hc.getRange(fila, 1, 1, COLUMNAS_CERTIFICADOS.length).getValues()[0];
+  /* --- progreso de lectura y tiempo --- */
+  var hp = ss.getSheetByName(HOJA_PROGRESO);
+  if (hp && hp.getLastRow() > 1) {
+    hp.getDataRange().getValues().slice(1).forEach(function (f) {
+      var correo = normalizar(f[1]);
+      if (!correo) return;
+      porCorreo[correo] = porCorreo[correo] || { correo: correo, nombre: f[2] || "" };
+      var p = porCorreo[correo];
+      p.nombre = p.nombre || f[2] || "";
+      p.modulos = p.modulos || {};
+      p.modulos[String(f[3])] = {
+        numero: f[3],
+        titulo: f[4] || ("Módulo " + f[3]),
+        seccionesHechas: parseLista(f[5]),
+        total: Number(f[6]) || 0,
+        tiempo: Number(f[7]) || 0,
+        actualizado: formatearFechaIso(f[0])
+      };
+    });
+  }
+
+  /* --- resultados por protocolo --- */
+  var hres = ss.getSheetByName(HOJA_RESULTADOS);
+  if (hres && hres.getLastRow() > 1) {
+    hres.getDataRange().getValues().slice(1).forEach(function (f) {
+      var correo = normalizar(f[2]);
+      if (!correo) return;
+      porCorreo[correo] = porCorreo[correo] || { correo: correo, nombre: f[3] || "" };
+      var p = porCorreo[correo];
+      p.nombre = p.nombre || f[3] || "";
+      p.protocolos = p.protocolos || {};
+      var id = String(f[6] || "").trim();
+      if (!id) return;
+      var prev = p.protocolos[id];
+      var nota = Number(f[11]) || 0;
+      p.protocolos[id] = {
+        id: id,
+        nombre: f[7] || id,
+        aprobado: prev ? (prev.aprobado || f[12] === "Sí") : f[12] === "Sí",
+        intentos: prev ? prev.intentos + 1 : 1,
+        mejor: prev ? Math.max(prev.mejor, nota) : nota,
+        ultimo: nota,
+        ultimoIntento: Number(f[8]) || 1
+      };
+    });
+  }
+
+  /* --- arma la respuesta --- */
+  var participantes = Object.keys(porCorreo).map(function (correo) {
+    var p = porCorreo[correo];
+    var mods = Object.keys(p.modulos || {}).map(function (k) {
+      return p.modulos[k];
+    }).sort(function (a, b) { return Number(a.numero) - Number(b.numero); });
+
+    var seccionesOk = 0, seccionesTotales = 0, tiempoTotal = 0, modulosCompletos = 0;
+    mods.forEach(function (m) {
+      seccionesOk += m.seccionesHechas.length;
+      seccionesTotales += m.total;
+      tiempoTotal += m.tiempo;
+      if (m.total > 0 && m.seccionesHechas.length >= m.total) modulosCompletos++;
+    });
+
+    var protos = Object.keys(p.protocolos || {}).map(function (k) {
+      var x = p.protocolos[k];
+      return {
+        id: x.id,
+        nombre: x.nombre,
+        aprobado: x.aprobado,
+        intentos: x.intentos,
+        mejor: x.mejor,
+        ultimo: x.ultimo,
+        ultimoIntento: x.ultimoIntento
+      };
+    });
+
+    var aprobados = protos.filter(function (x) { return x.aprobado; }).length;
+    var intentos = protos.reduce(function (s, x) { return s + x.intentos; }, 0);
+
+    return {
+      correo: p.correo,
+      nombre: p.nombre || "(sin nombre)",
+      sede: p.sede || "",
+      cargo: p.cargo || "",
+      dependencia: p.dependencia || "",
+      profesion: p.profesion || "",
+      telefono: p.telefono || "",
+      horario: p.horario || "",
+      observaciones: p.observaciones || "",
+      fechaRegistro: p.fechaRegistro || "",
+      modulos: mods.map(function (m) {
+        return {
+          numero: m.numero,
+          titulo: m.titulo,
+          total: m.total,
+          hechas: m.seccionesHechas.length,
+          completo: m.total > 0 && m.seccionesHechas.length >= m.total,
+          tiempo: m.tiempo,
+          actualizado: m.actualizado
+        };
+      }),
+      protocolos: protos,
+      modulosCompletos: modulosCompletos,
+      avanceLectura: seccionesTotales
+        ? Math.round((seccionesOk / seccionesTotales) * 100)
+        : 0,
+      tiempoTotal: tiempoTotal,
+      aprobados: aprobados,
+      totalProtocolos: TOTAL_PROTOCOLOS,
+      pendientes: Math.max(0, TOTAL_PROTOCOLOS - protos.length),
+      intentos: intentos
+    };
+  }).sort(function (a, b) {
+    return String(a.nombre).localeCompare(String(b.nombre), "es");
+  });
+
+  guardarSesiones();
+
   return {
     ok: true,
-    encontrado: true,
-    codigo: codigo,
-    datos: {
-      codigo: v[0],
-      fecha: formatearFecha(v[1]),
-      nombre: v[2],
-      correo: v[3],
-      sede: v[4],
-      cargo: v[5],
-      protocolo: v[6],
-      protocoloNombre: v[7],
-      intento: v[8],
-      aciertos: v[9],
-      total: v[10],
-      porcentaje: v[11],
-      temas: v[12]
-    }
+    participantes: participantes,
+    aprobados: participantes.reduce(function (s, p) { return s + p.aprobados; }, 0),
+    intentos: participantes.reduce(function (s, p) { return s + p.intentos; }, 0),
+    tiempoTotal: participantes.reduce(function (s, p) { return s + p.tiempoTotal; }, 0),
+    consultado: hoyIso()
   };
+}
+
+/**
+ * Borra TODO el progreso de una persona: lectura, tiempo y resultados.
+ * La ficha (nombre, sede, cargo) se conserva.
+ */
+function adminBorrar(d) {
+  cargarSesiones();
+  if (!revisarToken(d.token)) {
+    return { ok: false, mensaje: "La sesión expiró. Vuelve a entrar." };
+  }
+
+  var correo = normalizar(d.correo);
+  if (!correo) return { ok: false, mensaje: "Falta el correo." };
+
+  var ss = obtenerSpreadsheet();
+
+  var borrados = 0;
+  [HOJA_PROGRESO, HOJA_RESULTADOS].forEach(function (nombreHoja) {
+    var hoja = ss.getSheetByName(nombreHoja);
+    if (!hoja || hoja.getLastRow() < 2) return;
+    var valores = hoja.getDataRange().getValues();
+    var columnaCorreo = nombreHoja === HOJA_PROGRESO ? 1 : 2;
+    for (var i = valores.length - 1; i >= 1; i--) {
+      if (normalizar(valores[i][columnaCorreo]) === correo) {
+        hoja.deleteRow(i + 1);
+        borrados++;
+      }
+    }
+  });
+
+  return { ok: true, correo: correo, filasBorradas: borrados };
+}
+
+/** Convierte "0,2,4" en [0, 2, 4]. */
+function parseLista(texto) {
+  if (texto === null || texto === undefined || texto === "") return [];
+  return String(texto).split(",")
+    .map(function (x) { return parseInt(x, 10); })
+    .filter(function (x) { return !isNaN(x); });
 }
 
 function listarParticipantes() {
@@ -339,7 +648,11 @@ function listarParticipantes() {
       nombre: f[2],
       sede: f[3],
       cargo: f[4],
-      verificado: f[5]
+      dependencia: f[5],
+      profesion: f[6],
+      telefono: f[7],
+      horario: f[8],
+      observaciones: f[9]
     };
   });
   return { ok: true, total: participantes.length, participantes: participantes };
@@ -368,7 +681,7 @@ function crearHojas() {
 }
 
 function crearHojas(ss) {
-  [HOJA_REGISTRO, HOJA_RESULTADOS, HOJA_CERTIFICADOS].forEach(function (nombre) {
+  [HOJA_REGISTRO, HOJA_RESULTADOS, HOJA_PROGRESO].forEach(function (nombre) {
     if (!ss.getSheetByName(nombre)) ss.insertSheet(nombre);
   });
   return ss;
@@ -442,25 +755,46 @@ function htmlEscape(s) {
  * recibe datos. Luego borra la fila de prueba que queda.
  * ------------------------------------------------------------------ */
 function testRegistro() {
-  var r1 = registrarResultado({
+  var r1 = registrarParticipante({
+    correo: "prueba@esevillavicencio.gov.co",
+    nombre: "Participante de Prueba",
+    sede: "CAMPUS ESE MUNICIPAL",
+    cargo: "Enfermería",
+    dependencia: "Urgencias",
+    profesion: "Enfermería"
+  });
+  Logger.log("registrarParticipante: " + JSON.stringify(r1));
+
+  var r2 = registrarResultado({
     codigo: "ESE-VLL-2026-CAUZ-000001",
     correo: "prueba@esevillavicencio.gov.co",
     nombre: "Participante de Prueba",
     sede: "CAMPUS ESE MUNICIPAL",
-    cargo: "Enfermeria",
+    cargo: "Enfermería",
     protocolo: "codigo-azul",
-    protocoloNombre: "Codigo Azul",
+    protocoloNombre: "Código Azul",
     intento: 1,
     aciertos: 9,
     total: 10,
     porcentaje: 90,
     aprobado: true,
-    temas: [{ titulo: "Codigo Azul", porcentaje: 90 }]
+    temas: [{ titulo: "Código Azul", porcentaje: 90 }]
   });
-  Logger.log("registrarResultado: " + JSON.stringify(r1));
+  Logger.log("registrarResultado: " + JSON.stringify(r2));
 
-  var r2 = consultarCodigo({ codigo: "ESE-VLL-2026-CAUZ-000001" });
-  Logger.log("consulta: " + JSON.stringify(r2));
+  var r3 = registrarProgreso({
+    correo: "prueba@esevillavicencio.gov.co",
+    nombre: "Participante de Prueba",
+    modulo: "1",
+    titulo: "Código Azul",
+    secciones: "0,1",
+    totalSecciones: 4,
+    tiempo: 300
+  });
+  Logger.log("registrarProgreso: " + JSON.stringify(r3));
 
-  Logger.log("Queda una fila de prueba en " + NOMBRE_SPREADSHEET + ".");
+  var r4 = adminEntrar({ clave: "CLAVE_ADMIN_REAL" });
+  Logger.log("adminEntrar: " + JSON.stringify(r4));
+
+  Logger.log("Quedan filas de prueba en " + NOMBRE_SPREADSHEET + ".");
 }

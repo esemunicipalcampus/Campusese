@@ -76,6 +76,12 @@
       });
       const leidos = new Set(A.modulosLeidos(U.correo));
 
+      /* La evaluación solo se abre con TODAS las secciones del protocolo leídas. */
+      const estadoMods = A.estadoModulos(U.correo, p.id);
+      const seccionesTotales = estadoMods.reduce((s, m) => s + m.total, 0);
+      const seccionesListas = estadoMods.reduce((s, m) => s + m.hechas, 0);
+      const listoParaEvaluar = A.evaluacionHabilitada(U.correo, p.id);
+
       const insignia = {
         aprobado: '<span class="pill-est pill-ok">Aprobado ✓</span>',
         "en-curso": '<span class="pill-est pill-avanzando">En curso</span>',
@@ -84,10 +90,20 @@
       }[est];
 
       const bloqueEval = est === "aprobado"
-        ? '<a class="btn btn-azul" href="certificado.html?p=' + encodeURIComponent(p.id) + '">Ver reconocimiento</a>'
+        ? '<a class="btn btn-azul" href="resultado.html?p=' + encodeURIComponent(p.id) + '">Ver mi resultado</a>'
         : est === "agotado"
           ? '<a class="btn btn-borde" href="resultado.html?p=' + encodeURIComponent(p.id) + '">Ver intentos</a>'
-          : '<a class="btn btn-azul" href="evaluacion.html?p=' + encodeURIComponent(p.id) + '">Presentar evaluación</a>';
+          : listoParaEvaluar
+            ? '<a class="btn btn-azul" href="evaluacion.html?p=' + encodeURIComponent(p.id) + '">Presentar evaluación</a>'
+            : '<button type="button" class="btn" disabled>Termina la lectura para evaluar</button>';
+
+      const barraLectura = seccionesTotales
+        ? '<div class="pt-lectura">'
+          + '  <span class="pt-lectura-txt">Lectura ' + seccionesListas + ' de ' + seccionesTotales + ' secciones</span>'
+          + '  <span class="pt-lectura-barra"><i style="width:'
+          + Math.round((seccionesListas / seccionesTotales) * 100) + '%"></i></span>'
+          + '</div>'
+        : '';
 
       const nMods = (p.modulos || []).length;
       return ''
@@ -104,13 +120,21 @@
       + '  <p class="pt-desc">' + A.esc(p.descripcion) + '</p>'
       + '  <ul class="pt-modulos">'
       +    mods.map(function (m) {
-             return '<li class="' + (leidos.has(m.numero) ? "leido" : "") + '">'
+             const em = estadoMods.find(function (x) { return x.numero === m.numero; }) || {};
+             const nHechas = em.hechas || 0;
+             const nTotal = em.total || (m.secciones ? m.secciones.length : 0);
+             const completo = !!em.completo;
+             return '<li class="' + (completo ? "leido" : nHechas ? "leyendo" : "") + '">'
                + '<a href="modulo.html?n=' + m.numero + '&p=' + encodeURIComponent(p.id) + '">'
                + '<span>' + A.esc(m.titulo) + '</span>'
-               + (leidos.has(m.numero) ? '<em>✓ leído</em>' : '<em>' + (m.secciones ? m.secciones.length : 0) + ' secciones</em>')
+               + (completo
+                   ? '<em>✓ leído</em>'
+                   : nTotal ? '<em>' + nHechas + ' de ' + nTotal + ' secciones</em>'
+                            : '<em>' + nTotal + ' secciones</em>')
                + '</a></li>';
            }).join("")
       + '  </ul>'
+      +      barraLectura
       +      (p.pdf
         ? '  <a class="pt-pdf" href="' + A.esc(p.pdf) + '" target="_blank" rel="noopener">'
           + '<span aria-hidden="true">📄</span> Ver el procedimiento completo (PDF) — si quieres consultarlo</a>'

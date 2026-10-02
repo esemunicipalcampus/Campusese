@@ -154,19 +154,182 @@
     return nuevo;
   }
 
-  /* Progreso de lectura por módulo */
+  /* Progreso de lectura: sección por sección, y tiempo en cada módulo */
+  /* El progreso vive en memoria mientras la página está abierta y se vuelca a
+   localStorage. Sin esta caché, BD.leer devuelve una copia nueva en cada
+   llamada y el cronómetro y las secciones se pisarían entre sí. */
+  const progresoEnMemoria = {};
+
   function obtenerProgreso(correo) {
-    return BD.leer("ese_progreso_" + correo, {}) || {};
+    if (progresoEnMemoria[correo]) return progresoEnMemoria[correo];
+    progresoEnMemoria[correo] = BD.leer("ese_progreso_" + correo, {}) || {};
+    return progresoEnMemoria[correo];
   }
+
+  function guardarProgreso(correo) {
+    const p = obtenerProgreso(correo);
+    BD.escribir("ese_progreso_" + correo, p);
+    return p;
+  }
+
+  /** Olvida la copia en memoria (tras un borrado). */
+  function olvidarProgreso(correo) {
+    delete progresoEnMemoria[correo];
+  }
+
+  /** Módulo completo = todas sus secciones marcadas como realizadas. */
+  function asegurarModulo(correo, numeroModulo) {
+    const p = obtenerProgreso(correo);
+    if (!p[numeroModulo]) p[numeroModulo] = { secciones: [], tiempo: 0, abierto: null };
+    guardarProgreso(correo);
+    if (!Array.isArray(p[numeroModulo].secciones)) p[numeroModulo].secciones = [];
+    if (typeof p[numeroModulo].tiempo !== "number") p[numeroModulo].tiempo = 0;
+    return p[numeroModulo];
+  }
+
   function marcarModuloLeido(correo, numeroModulo) {
     if (!correo) return;
     const p = obtenerProgreso(correo);
-    p[numeroModulo] = { leido: true, fecha: iso(new Date()) };
-    BD.escribir("ese_progreso_" + correo, p);
+    p[numeroModulo].leido = true;
+    p[numeroModulo].fecha = iso(new Date());
+    guardarProgreso(correo);
   }
+
+  /** Índices de las secciones ya realizadas de un módulo. */
+  function seccionesHechas(correo, numeroModulo) {
+    const p = obtenerProgreso(correo);
+    const m = p[numeroModulo];
+    if (!m) return [];
+    if (Array.isArray(m.secciones)) return m.secciones.slice();
+    return m.leido ? [0] : [];
+  }
+
+  /** Marca una sección como realizada (idempotente). */
+  function marcarSeccionLeida(correo, numeroModulo, indice) {
+    if (!correo) return seccionesHechas(correo, numeroModulo);
+    const m = asegurarModulo(correo, numeroModulo);
+    if (!m.secciones.includes(indice)) {
+      m.secciones.push(indice);
+      m.secciones.sort(function (a, b) { return a - b; });
+      m.fecha = iso(new Date());
+      guardarProgreso(correo);
+      enviarProgreso(correo, numeroModulo);
+    }
+    return m.secciones;
+  }
+
+  /** ¿Están realizadas todas las secciones de este módulo? */
+  function moduloCompleto(correo, numeroModulo, totalSecciones) {
+    const total = Number(totalSecciones || 0);
+    if (!total) return true;
+    const hechas = seccionesHechas(correo, numeroModulo);
+    for (let i = 0; i < total; i++) if (!hechas.includes(i)) return false;
+    return true;
+  }
+
+  /** Lista de módulos del protocolo con su estado de lectura. */
+  function estadoModulos(correo, idProtocolo) {
+    const p = protocolo(idProtocolo);
+    if (!p) return [];
+    return (p.modulos || []).map(function (n) {
+      const mod = window.ContenidoCurso ? window.ContenidoCurso.porNumero(n) : null;
+      const total = mod ? (mod.secciones || []).length : 0;
+      const hechas = seccionesHechas(correo, n);
+      return {
+        numero: n,
+        titulo: mod ? mod.titulo : "Módulo " + n,
+        total: total,
+        hechas: hechas.length,
+        completo: moduloCompleto(correo, n, total),
+        tiempo: tiempoModulo(correo, n),
+      };
+    });
+  }
+
+  /** ¿Se puede abrir la evaluación de este protocolo? */
+  function evaluacionHabilitada(correo, idProtocolo) {
+    const est = estadoModulos(correo, idProtocolo);
+    return est.length > 0 && est.every(function (m) { return m.completo; });
+  }
+
   function modulosLeidos(correo) {
     const p = obtenerProgreso(correo);
-    return Object.keys(p).filter(k => p[k] && p[k].leido).map(Number);
+    return Object.keys(p)
+      .filter(function (k) {
+        const m = p[k];
+        return m && (m.leido || (Array.isArray(m.secciones) && m.secciones.length > 0));
+      })
+      .map(Number);
+  }
+
+  /* ---------------- Tiempo de estudio por módulo ---------------- */
+
+  function tiempoModulo(correo, numeroModulo) {
+    const p = obtenerProgreso(correo);
+    const m = p[numeroModulo];
+    return m && typeof m.tiempo === "number" ? m.tiempo : 0;
+  }
+
+  /** Cronómetro: arranca al abrir el módulo y acumula al salir o cambiar de pestaña. */
+  function iniciarCronometro(correo, numeroModulo) {
+    if (!correo) return function () { };
+    const m = asegurarModulo(correo, numeroModulo);
+
+    function abrir() {
+      if (m.abierto) return;
+      m.abierto = Date.now();
+      guardarProgreso(correo);
+    }
+
+    function cerrar() {
+      if (!m.abierto) return;
+      const segundos = Math.round((Date.now() - m.abierto) / 1000);
+      m.abierto = null;
+      if (segundos > 0 && segundos < 6 * 3600) {
+        m.tiempo = (m.tiempo || 0) + segundos;
+        guardarProgreso(correo);
+        Remoto.registrarTiempo({
+          correo: correo,
+          modulo: numeroModulo,
+          segundos: segundos,
+          total: m.tiempo,
+        });
+      }
+    }
+
+    abrir();
+
+    window.addEventListener("pagehide", cerrar);
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "hidden") cerrar();
+      else abrir();
+    });
+    return cerrar;
+  }
+
+  /** Envía el avance de lectura de un módulo al registro central. */
+  function enviarProgreso(correo, numeroModulo) {
+    const mod = window.ContenidoCurso ? window.ContenidoCurso.porNumero(numeroModulo) : null;
+    const m = obtenerProgreso(correo)[numeroModulo] || {};
+    Remoto.registrarProgreso({
+      correo: correo,
+      modulo: numeroModulo,
+      titulo: mod ? mod.titulo : "Módulo " + numeroModulo,
+      secciones: m.secciones || [],
+      totalSecciones: mod ? (mod.secciones || []).length : 0,
+      tiempo: m.tiempo || 0,
+      fecha: iso(new Date()),
+    });
+  }
+
+  /** Protocolo al que pertenece un módulo, por número. */
+  function protocoloDeModulo(numeroModulo) {
+    const mod = window.ContenidoCurso ? window.ContenidoCurso.porNumero(numeroModulo) : null;
+    if (mod && mod.protocolo) return mod.protocolo;
+    const p = protocolos().find(function (x) {
+      return (x.modulos || []).indexOf(Number(numeroModulo)) >= 0;
+    });
+    return p ? p.id : "";
   }
 
   /* ====================================================================
@@ -229,7 +392,7 @@
     ].join("|");
     const n = (hash(base) % 1000000).toString().padStart(6, "0");
     const anio = new Date(resultado.fecha).getFullYear();
-    return C.reconocimiento.prefijoCodigo + "-" + anio + "-" + sig + "-" + n;
+    return C.codigo.prefijo + "-" + anio + "-" + sig + "-" + n;
   }
 
   /* ====================================================================
@@ -259,7 +422,18 @@
 
     registrarParticipante(datos) { return this.enviar("registro", datos); },
     registrarResultado(datos) { return this.enviar("resultado", datos); },
-    consultarCodigo(codigo) { return this.enviar("consulta", { codigo }); },
+    registrarProgreso(datos) { return this.enviar("progreso", datos); },
+    registrarTiempo(datos) { return this.enviar("tiempo", datos); },
+
+    /* ---------------- Panel administrativo ----------------
+       La contraseña maestra NUNCA viaja incrustada en esta página:
+       el backend la compara y devuelve un token de sesión. */
+
+    adminEntrar(clave) { return this.enviar("adminEntrar", { clave: clave }); },
+    adminProgreso(token, q) { return this.enviar("adminProgreso", { token: token, q: q || "" }); },
+    adminBorrarProgreso(token, correo) {
+      return this.enviar("adminBorrar", { token: token, correo: correo });
+    },
 
     /**
      * Registro institucional. El código de acceso lo escribe el usuario y
@@ -417,12 +591,12 @@
                     location.pathname.endsWith("modulo.html") ||
                     location.pathname.endsWith("evaluacion.html") ||
                     location.pathname.endsWith("resultado.html") ||
-                    location.pathname.endsWith("certificado.html");
+                    location.pathname.endsWith("perfil.html");
 
     const enlaces = [
       { href: "protocolos.html", texto: "Protocolos" },
       { href: "resultado.html", texto: "Mis resultados" },
-      { href: "certificado.html", texto: "Mis certificados" },
+      { href: "perfil.html", texto: "Mi perfil" },
     ];
 
     let nav = "";
@@ -565,6 +739,9 @@
     registrarDesdeGoogle, perfilCompleto, aviso,
     obtenerResultados, guardarResultado,
     obtenerProgreso, marcarModuloLeido, modulosLeidos,
+    marcarSeccionLeida, seccionesHechas, moduloCompleto,
+    estadoModulos, evaluacionHabilitada,
+    tiempoModulo, iniciarCronometro, protocoloDeModulo,
     protocolos, protocolo, protocoloDeTema,
     totalPreguntasProtocolo, resultadosProtocolo, aproboProtocolo, intentosProtocolo,
     generarCodigo,

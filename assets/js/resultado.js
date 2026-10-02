@@ -109,24 +109,23 @@ let html = htmlSelector();
   html += '<div class="nota-grande' + (r.aprobado ? "" : " baja") + '">' + r.porcentaje + '%</div>';
   html += '<div class="nota-etiqueta">' + r.aciertos + ' de ' + r.total + ' respuestas correctas</div>';
 
-  if (r.aprobado) {
+if (r.aprobado) {
     html += '<div class="aviso aviso-ok" style="max-width:560px;margin:1.1rem auto 0;text-align:left">'
-      + '<strong>Certificado disponible</strong>'
-      + 'Tu código de verificación es <code>' + A.esc(r.codigo) + '</code>. '
-      + 'Descárgalo o imprímelo para presentarlo ante la ESE Municipal.'
+      + '<strong>Protocolo aprobado</strong>'
+      + 'Tu nota quedó registrada en el sistema con el código de seguimiento <code>'
+      + A.esc(r.codigo) + '</code>. Ya puedes continuar con los demás protocolos.'
       + '</div>';
   } else {
     html += '<div class="aviso aviso-error" style="max-width:560px;margin:1.1rem auto 0;text-align:left">'
       + '<strong>No alcanzaste la nota mínima</strong>'
-      + 'Se requiere ' + r.notaMinima + '% en total y al menos ' + r.notaMinimaTema
-      + '% en cada tema. Revisa las justificaciones, estudia de nuevo los módulos e inténtalo otra vez.'
+      + 'Se requiere ' + r.notaMinima + '% en total. Revisa las justificaciones, '
+      + 'estudia de nuevo los módulos e inténtalo otra vez.'
       + '</div>';
   }
 
 html += '<div class="acciones-resultado">';
   if (r.aprobado) {
-    html += '<a class="btn btn-azul" href="certificado.html?p=' + encodeURIComponent(idProtocolo)
-      + '&codigo=' + encodeURIComponent(r.codigo) + '">Ver / descargar certificado</a>';
+    html += '<a class="btn btn-azul" href="protocolos.html">Volver a los protocolos</a>';
   } else if (P) {
     const reintentos = todos.filter(function (x) { return !x.aprobado; }).length;
     if (reintentos < C.programa.intentosMaximos) {
@@ -146,8 +145,8 @@ html += '<div class="acciones-resultado">';
   html += '<div class="tarjeta mt-1">';
   html += '<h2>Resultado por tema</h2>';
   html += '<div class="resumen-temas">';
-  r.temas.forEach(function (t) {
-    const ok = t.porcentaje >= r.notaMinimaTema;
+r.temas.forEach(function (t) {
+    const ok = t.porcentaje >= r.notaMinima;
     html += '<div class="resumen-fila">';
     html += '<div class="nom">' + A.esc(t.numero) + '. ' + A.esc(t.titulo) + '</div>';
     html += '<div class="val">' + t.aciertos + '/' + t.total + '</div>';

@@ -415,12 +415,11 @@
       }
     }
 
-    if (resultado.aprobado) {
+if (resultado.aprobado) {
       A.aviso("¡Felicitaciones! Aprobaste " + P.nombre + " con " + resultado.porcentaje
-        + " %. Abriendo tu reconocimiento…", "ok", 5000);
+        + " %. Tu resultado ya quedó registrado.", "ok", 5000);
       setTimeout(function () {
-        location.href = "certificado.html?p=" + encodeURIComponent(P.id)
-          + "&codigo=" + encodeURIComponent(resultado.codigo);
+        location.href = "resultado.html?p=" + encodeURIComponent(P.id);
       }, 2200);
     } else {
       A.aviso("No alcanzaste el " + C.programa.notaAprobacion + " % en " + P.nombre
@@ -435,6 +434,48 @@
 
   function intentosHechos() { return A.intentosProtocolo(U.correo, P.id); }
 
+  /**
+   * La evaluación está bloqueada mientras falte alguna sección por leer
+   * en cualquier módulo del protocolo.
+   */
+  function bloquearSiFaltaLectura() {
+    if (A.evaluacionHabilitada(U.correo, P.id)) return false;
+
+    const est = A.estadoModulos(U.correo, P.id);
+    const pendientes = est.filter(function (m) { return !m.completo; });
+
+    let html =
+      '<div class="tarjeta"><div class="vacio">'
+      + '<span class="icono">📖</span>'
+      + '<h2>Antes de evaluar, termina la lectura</h2>'
+      + '<p class="texto-suave">La evaluación de ' + A.esc(P.nombre)
+      + ' se abre cuando marcaste como realizadas todas las secciones de sus módulos.</p>'
+      + '<div class="lista-pendientes">';
+    pendientes.forEach(function (m) {
+      html += '<div class="pendiente-item">'
+        + '<span class="pendiente-titulo">' + A.esc(m.titulo) + '</span>'
+        + '<span class="pendiente-barras"><i style="width:'
+        + (m.total ? Math.round((m.hechas / m.total) * 100) : 0) + '%"></i></span>'
+        + '<span class="pendiente-txt">' + m.hechas + ' de ' + m.total + ' secciones</span>'
+        + '<a class="btn btn-borde btn-peq" href="modulo.html?n=' + m.numero
+        + '&p=' + encodeURIComponent(P.id) + '">Continuar</a>'
+        + '</div>';
+    });
+    html += '</div>'
+      + '<div class="acciones-resultado">'
+      + '<a class="btn btn-azul" href="modulo.html?n=' + (pendientes[0] ? pendientes[0].numero : 1)
+      + '&p=' + encodeURIComponent(P.id) + '">Ir a leer</a>'
+      + '<a class="btn btn-borde" href="protocolos.html">Volver a los protocolos</a>'
+      + '</div></div></div>';
+
+    zona.innerHTML = html;
+    if (barra) barra.style.width = "0%";
+    if (txtBarra) txtBarra.textContent = "Lectura pendiente";
+    if (meta) meta.textContent = P.nombre + " · falta lectura";
+    if (acciones) acciones.innerHTML = '<a class="btn btn-borde" href="protocolos.html">Volver</a>';
+    return true;
+  }
+
   function bloquearSiNoPuedeIntentar() {
     const previos = intentosHechos();
 
@@ -443,11 +484,11 @@
         '<div class="tarjeta"><div class="vacio">'
         + '<span class="icono">✅</span>'
         + '<h2>Ya aprobaste este protocolo</h2>'
-        + '<p class="texto-suave">Tu reconocimiento de ' + A.esc(P.nombre)
-        + ' ya está disponible. No se puede repetir una evaluación aprobada.</p>'
+        + '<p class="texto-suave">Tu resultado de ' + A.esc(P.nombre)
+        + ' ya está aprobado. No se puede repetir una evaluación aprobada.</p>'
         + '<div class="acciones-resultado">'
-        + '<a class="btn btn-azul" href="certificado.html?p=' + encodeURIComponent(P.id) + '">Ver mi reconocimiento</a>'
-        + '<a class="btn btn-borde" href="resultado.html?p=' + encodeURIComponent(P.id) + '">Ver mi resultado</a>'
+        + '<a class="btn btn-azul" href="resultado.html?p=' + encodeURIComponent(P.id) + '">Ver mi resultado</a>'
+        + '<a class="btn btn-borde" href="protocolos.html">Ver protocolos</a>'
         + '</div></div></div>';
       if (barra) barra.style.width = "100%";
       if (txtBarra) txtBarra.textContent = "Completada";
@@ -484,6 +525,8 @@
   /* ---------------------------------------------------------------- */
 
   preparar();
-  recuperarBorrador();
-  if (!bloquearSiNoPuedeIntentar()) pintar();
+  if (!bloquearSiNoPuedeIntentar() && !bloquearSiFaltaLectura()) {
+    recuperarBorrador();
+    pintar();
+  }
 })();

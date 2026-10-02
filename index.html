@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Protocolos de Seguridad del Paciente | ESE Municipal de Villavicencio × Unillanos</title>
-<meta name="description" content="Capacitación virtual en Código Azul, RCP, carro de paro, ronda de seguridad y entrega de turno para el personal de la ESE Municipal de Villavicencio.">
+<title>Campus Virtual ESE Municipal | Protocolos de Seguridad del Paciente</title>
+<meta name="description" content="Campus virtual de la ESE Municipal de Villavicencio: Código Azul, carro de paro, ronda de seguridad y entrega de turno, con lectura obligatoria y evaluación por protocolo.">
 <link rel="icon" href="assets/logos/eselogo.jpg">
 <link rel="stylesheet" href="assets/css/estilos.css">
 </head>
@@ -16,17 +16,8 @@
 
   <!-- ===================== PORTADA ===================== -->
   <section class="portada">
-    <div class="portada-doble">
-      <img class="logo-ese" src="assets/logos/eselogo.jpg" alt="Logo ESE Municipal de Villavicencio">
-      <div class="sep" aria-hidden="true"></div>
-      <img class="logo-unillanos" src="assets/logos/Logo_unillanos1.png" alt="Logo Universidad de los Llanos">
-    </div>
-
-    <h1>Protocolos de Seguridad del Paciente</h1>
+    <h1 id="tituloPortada">Campus Virtual ESE Municipal</h1>
     <p class="subtitulo" id="subtituloPortada"></p>
-
-    <div class="etiquetas" id="etiquetasPortada"></div>
-
     <div class="datos-curso" id="datosCurso"></div>
   </section>
 
@@ -37,7 +28,8 @@
 
 <footer class="no-imprimir" style="text-align:center;padding:1.5rem 1rem 2.5rem;color:var(--texto-suave);font-size:.82rem;border-top:1px solid var(--borde)">
   <strong>ESE Municipal de Villavicencio</strong> · Empresa Social del Estado del Municipio de Villavicencio<br>
-  Universidad de los Llanos · Ruralito Unillanos
+  Universidad de los Llanos · Ruralito Unillanos<br>
+  <a href="admin.html" style="color:var(--texto-suave)">Acceso de coordinación</a>
 </footer>
 
 <script src="assets/js/config.js"></script>
@@ -57,13 +49,6 @@
   /* ---------- textos de portada ---------- */
   document.getElementById("subtituloPortada").textContent = C.programa.subtitulo;
 
-  document.getElementById("etiquetasPortada").innerHTML = [
-    C.entidadSalud.sigla,
-    C.entidadAcademica.sigla,
-    ...(C.sedes || []),
-    "Reconocimiento verificable",
-  ].map(t => `<span class="etiqueta">${A.esc(t)}</span>`).join("");
-
   const prots = A.protocolos();
   const nTemas = window.TEMAS ? window.TEMAS.length : 0;
   const nModulos = window.CURSO ? window.CURSO.modulos.length : 0;
@@ -76,7 +61,6 @@
     [nTemas, "Temas de evaluación"],
     [nPreguntas, "Preguntas"],
     [horasTotal + " h", "Duración total"],
-    [C.programa.notaAprobacion + "%", "Nota de aprobación"],
   ].map(([v, t]) => `<div class="dato"><strong>${A.esc(v)}</strong><span>${A.esc(t)}</span></div>`).join("");
 
   /* ---------- ficha mínima: sede y cargo ----------
@@ -97,7 +81,7 @@
               <option value="">Selecciona…</option>
               ${sedes.map(s => `<option value="${A.esc(s)}" ${previo.sede === s ? "selected" : ""}>${A.esc(s)}</option>`).join("")}
             </select>
-            <div class="ayuda">Se imprime en tu reconocimiento.</div>
+            <div class="ayuda">Queda guardada en tu perfil.</div>
           </div>
           <div class="campo medio">
             <label for="f_cargo">Cargo *</label>
@@ -128,7 +112,7 @@
             <li>Ingresa con tu cuenta de Google (una sola vez).</li>
             <li>Elige tu sede y tu cargo (una sola vez).</li>
             <li>Estudia y evalúa los 4 protocolos por separado.</li>
-            <li>Descarga el reconocimiento de cada protocolo que apruebes.</li>
+            <li>Consulta tu progreso y tus resultados cuando quieras.</li>
           </div>
         </div>`;
       A.Sesion.montarBoton(document.getElementById("zonaBotonGoogle"), () => pintarAcceso());
@@ -157,20 +141,22 @@
                <div class="info-cert"><span>Correo</span><strong>${A.esc(usuario.correo)}</strong></div>
                <div class="info-cert"><span>Sede</span><strong>${A.esc(ficha.sede || "—")}</strong></div>
                <div class="info-cert"><span>Cargo</span><strong>${A.esc(ficha.cargo || "—")}</strong></div>
+               ${ficha.dependencia ? `<div class="info-cert"><span>Dependencia</span><strong>${A.esc(ficha.dependencia)}</strong></div>` : ""}
+               ${ficha.profesion ? `<div class="info-cert"><span>Se dedica a</span><strong>${A.esc(ficha.profesion)}</strong></div>` : ""}
              </div>
              <p class="texto-suave texto-peq" style="margin-top:.8rem">
-               Tus datos vienen de Google y ya quedaron guardados. Solo se muestran;
-               no se vuelven a pedir.
+               Tu nombre y tu correo vienen de Google. Puedes modificar el resto de tus
+               datos cuando quieras desde «Mi perfil».
              </p>`
           : `<h2 style="margin-top:1.3rem">Elige tu sede y tu cargo</h2>
              <p class="texto-suave texto-peq">
-               Es lo único que se te pregunta, y se guarda una sola vez para que
-               aparezca en tu reconocimiento.
+               Es lo único que se te pregunta, y se guarda una sola vez.
              </p>
              ${pintarSelectorPerfil(usuario.correo)}`}
 
         <div class="acciones-resultado">
           <a href="protocolos.html" class="btn btn-azul">Ir a los protocolos</a>
+          <a href="perfil.html" class="btn btn-borde">Editar mis datos</a>
           ${completo ? "" : '<a href="#" class="btn btn-borde" id="btnEditarPerfil">Cambiar sede o cargo</a>'}
         </div>
       </div>`;

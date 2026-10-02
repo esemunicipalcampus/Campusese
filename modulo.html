@@ -83,9 +83,10 @@
       </div>`).join("")}</div>`;
   }
 
-  const seccionesHtml = mod.secciones.map(s => {
-    let h = `<section class="contenido-seccion">`;
+  const seccionesHtml = mod.secciones.map((s, i) => {
+    let h = `<section class="contenido-seccion" id="sec_${i}" data-seccion="${i}">`;
     // Algunas secciones solo llevan cita o nota: no se dibuja un título vacío.
+    h += `<div class="sec-contador">Sección ${i + 1} de ${mod.secciones.length}</div>`;
     if (s.titulo) h += `<h2>${A.esc(s.titulo)}</h2>`;
     if (s.subtituloRelacion) h += `<h3>${A.esc(s.subtituloRelacion)}</h3>`;
     if (s.cita) h += `<div class="cita">${A.esc(s.cita)}</div>`;
@@ -120,6 +121,7 @@
       <h1>${A.esc(mod.titulo)}</h1>
       ${mod.subtitulo ? `<p class="texto-suave" style="margin:0">${A.esc(mod.subtitulo)}</p>` : ""}
       ${mod.fuente ? `<p class="fuente">Fuente: ${A.esc(mod.fuente)}</p>` : ""}
+      <div class="caja-secciones" id="cajaSecciones"></div>
     </section>
 
     <div class="tarjeta">
@@ -136,38 +138,144 @@
           ? `<a class="btn btn-borde" href="modulo.html?n=${anterior.numero}${sufijoP}">← ${A.esc(anterior.titulo)}</a>`
           : `<a class="btn btn-borde" href="protocolos.html">← Volver a los protocolos</a>`}
         ${siguiente
-          ? `<a class="btn" href="modulo.html?n=${siguiente.numero}${sufijoP}">${A.esc(siguiente.titulo)} →</a>`
-          : (protocoloModulo
-              ? `<a class="btn btn-azul" href="evaluacion.html?p=${encodeURIComponent(protocoloModulo.id)}">Ir a la evaluación →</a>`
-              : `<a class="btn btn-azul" href="protocolos.html">Ir a los protocolos →</a>`)}
+          ? `<a class="btn btn-borde" href="modulo.html?n=${siguiente.numero}${sufijoP}">${A.esc(siguiente.titulo)} →</a>`
+          : ""}
       </div>
     </div>
 
-    <div class="acciones-resultado">
-      <button type="button" class="btn btn-azul" id="btnMarcarLeido">Marcar módulo como leído</button>
-      ${protocoloModulo
-        ? `<a class="btn btn-borde" href="evaluacion.html?p=${encodeURIComponent(protocoloModulo.id)}">Evaluar este protocolo</a>`
-        : ""}
-      <a class="btn btn-borde" href="protocolos.html">Volver a los protocolos</a>
-    </div>`;
+    <div class="acciones-resultado pie-modulo" id="pieModulo"></div>`;
 
-  /* Marcar como leído: avisa con una pestaña y no interrumpe la lectura. */
-  const btnLeido = document.getElementById("btnMarcarLeido");
+  /* ------------------------------------------------------------------
+     Lectura por secciones: solo se muestra la siguiente sección cuando
+     la anterior quedó marcada como realizada. Así no se puede saltar
+     contenido, y la evaluación queda bloqueada hasta terminar el módulo.
+     ------------------------------------------------------------------ */
+  const totalSecciones = mod.secciones.length;
+  const hechas = new Set(A.seccionesHechas(U.correo, mod.numero));
 
-  function reflejarLeido() {
-    if (!A.modulosLeidos(U.correo).includes(mod.numero)) return;
-    btnLeido.disabled = true;
-    btnLeido.textContent = "✓ Módulo leído";
-    btnLeido.classList.add("btn-ok");
+  /* Cronómetro: cuenta el tiempo real de estudio de este módulo. */
+  A.iniciarCronometro(U.correo, mod.numero);
+
+  const evalLink = document.getElementById("btnIrEvaluacion");
+  if (evalLink && !A.evaluacionHabilitada(U.correo, protocoloModulo.id)) {
+    evalLink.setAttribute("aria-disabled", "true");
+    evalLink.classList.add("btn-bloqueado");
+  }
+  const pie = document.getElementById("pieModulo");
+
+  function moduleCompleto() {
+    return A.moduloCompleto(U.correo, mod.numero, totalSecciones);
   }
 
-  btnLeido.addEventListener("click", () => {
-    A.marcarModuloLeido(U.correo, mod.numero);
-    reflejarLeido();
-    A.aviso(`Módulo ${mod.numero} marcado como leído ✓`, "ok");
-  });
+  function siguienteIndice() {
+    for (let i = 0; i < totalSecciones; i++) if (!hechas.has(i)) return i;
+    return -1;
+  }
 
-  reflejarLeido();
+  function aplicarEstado() {
+    const completo = moduleCompleto();
+    const sig = siguienteIndice();
+
+    A.$$(".contenido-seccion").forEach(function (el) {
+      const i = Number(el.dataset.seccion);
+      const visible = hechas.has(i) || i === sig;
+      el.classList.toggle("seccion-oculta", !visible);
+      el.classList.toggle("seccion-actual", i === sig);
+
+      const marca = el.querySelector(".sec-pie");
+      if (marca) marca.remove();
+      if (hechas.has(i)) {
+        el.insertAdjacentHTML("beforeend",
+          '<div class="sec-pie sec-pie-hecha">'
+          + '<span>✓ Sección ' + (i + 1) + ' realizada</span>'
+          + '</div>');
+      }
+    });
+
+    /* Navegador de secciones */
+    const caja = document.getElementById("cajaSecciones");
+    if (caja) {
+      if (completo) {
+        caja.innerHTML =
+          '<div class="aviso aviso-ok"><strong>✓ Leíste las ' + totalSecciones + ' secciones de este módulo</strong>'
+          + 'Ahora puedes presentar la evaluación del protocolo.</div>';
+      } else {
+        caja.innerHTML = 'Sección ' + (sig + 1) + ' de ' + totalSecciones
+          + ' · ' + hechas.size + ' realizadas';
+      }
+    }
+
+    /* Botón principal: "Siguiente sección" o ir a la evaluación. */
+    const pie = document.getElementById("pieModulo");
+    if (!pie) return;
+    const faltan = A.estadoModulos(U.correo, protocoloModulo ? protocoloModulo.id : "");
+
+    if (completo) {
+      pie.innerHTML = protocoloModulo
+        ? '<a class="btn btn-azul" href="evaluacion.html?p=' + encodeURIComponent(protocoloModulo.id)
+        + '">Ir a la evaluación →</a>'
+        + '<a class="btn btn-borde" href="protocolos.html">Volver a los protocolos</a>'
+        : '<a class="btn btn-azul" href="protocolos.html">Ir a los protocolos →</a>';
+    } else {
+      const pendientes = faltan.filter(function (m) { return m.numero !== mod.numero && !m.completo; });
+      pie.innerHTML =
+        '<button type="button" class="btn btn-azul" id="btnSiguienteSeccion">Siguiente sección →</button>'
+        + '<button type="button" class="btn btn-borde" id="btnMarcarLeido">Marcar sección como realizada</button>'
+        + (siguiente
+          ? '<a class="btn btn-borde" href="modulo.html?n='
+            + (todos[siguiente] ? todos[siguiente].numero : mod.numero) + sufijoP
+            + '">Ir al módulo ' + (todos[siguiente] ? todos[siguiente].numero : mod.numero) + ' →</a>'
+          : "")
+        + (pendientes.length
+          ? '<span class="pie-pendiente">Te falta leer ' + pendientes.length
+            + ' módulo' + (pendientes.length === 1 ? "" : "s") + ' más de este protocolo.</span>'
+          : '<span class="pie-pendiente">Este es el último módulo pendiente del protocolo.</span>');
+    }
+    conectarPie();
+  }
+
+  function conectarPie() {
+    const btnSig = document.getElementById("btnSiguienteSeccion");
+    if (btnSig) {
+      btnSig.addEventListener("click", function () {
+        const sig = siguienteIndice();
+        if (sig < 0) return;
+        A.marcarSeccionLeida(U.correo, mod.numero, sig);
+        hechas.add(sig);
+        aplicarEstado();
+        A.aviso("Sección " + (sig + 1) + " marcada como realizada ✓", "ok");
+        if (siguienteIndice() >= 0) {
+          const el = document.getElementById("sec_" + siguienteIndice());
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else {
+          A.marcarModuloLeido(U.correo, mod.numero);
+        }
+      });
+    }
+
+    const btnHecho = document.getElementById("btnMarcarLeido");
+    if (btnHecho) {
+      btnHecho.addEventListener("click", function () {
+        const sig = siguienteIndice();
+        if (sig < 0) return;
+        A.marcarSeccionLeida(U.correo, mod.numero, sig);
+        hechas.add(sig);
+        aplicarEstado();
+      });
+    }
+
+    const evalBtn = pie.querySelector('a[href^="evaluacion.html"]');
+    if (evalBtn) {
+      evalBtn.addEventListener("click", function (ev) {
+        if (!A.evaluacionHabilitada(U.correo, protocoloModulo.id)) {
+          ev.preventDefault();
+          A.aviso("Primero termina de leer todas las secciones de los módulos del protocolo.", "error");
+        }
+      });
+    }
+  }
+
+  aplicarEstado();
 })();
 </script>
 </body>

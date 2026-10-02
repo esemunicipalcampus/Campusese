@@ -24,12 +24,12 @@ window.CONFIG = {
    * 2) IDENTIDAD DEL PROGRAMA
    * ------------------------------------------------------------------ */
   programa: {
-    titulo: "Protocolos de Seguridad del Paciente",
+    titulo: "Campus Virtual ESE Municipal",
     subtitulo: "Código Azul · Carro de Paro · Ronda de Seguridad · Entrega de Turno",
     descripcion:
       "Capacitación institucional en los cuatro protocolos de seguridad del paciente " +
-      "de la ESE Municipal de Villavicencio. Cada protocolo se estudia, se evalúa " +
-      "y se certifica por separado.",
+      "de la ESE Municipal de Villavicencio. Cada protocolo se estudia y se evalúa " +
+      "por separado, con lectura obligatoria antes de la evaluación.",
     notaAprobacion: 80,           // % mínimo para aprobar
     intentosMaximos: 3,           // intentos por protocolo
   },
@@ -172,14 +172,13 @@ window.CONFIG = {
   ],
 
   /* --------------------------------------------------------------------
-   * 5) RECONOCIMIENTO
+   * 5) CÓDIGOS DE SEGUIMIENTO
    * ------------------------------------------------------------------
-   * No lleva firmas: es un reconocimiento de participación y aprobación,
-   * verificado con el código único de cada protocolo.
+   * Cada intento de evaluación queda con un código único. No es un
+   * certificado: solo sirve para identificar el intento en el registro.
    * ------------------------------------------------------------------ */
-  reconocimiento: {
-    prefijoCodigo: "ESE-VLL",
-    texto: "Reconocimiento de participación y aprobación",
+  codigo: {
+    prefijo: "ESE-VLL",
   },
 
   /* --------------------------------------------------------------------

@@ -499,86 +499,7 @@ table.datos td:first-child { font-weight: 600; color: var(--verde-oscuro); }
 /* ------------------------------------------------------------------ */
 /* Certificado                                                          */
 /* ------------------------------------------------------------------ */
-.cert-lienzo { background: #6B7785; padding: 1.5rem; border-radius: var(--radio); overflow: auto; }
 
-.certificado {
-  background: var(--blanco);
-  width: 1000px; height: 707px;
-  max-width: 100%;
-  margin: 0 auto;
-  padding: 40px 48px;
-  position: relative;
-  box-shadow: var(--sombra-f);
-  display: flex; flex-direction: column;
-  font-family: Georgia, "Times New Roman", serif;
-  color: #1a1a1a;
-}
-.cert-marco {
-  position: absolute; inset: 16px;
-  border: 3px double var(--verde); pointer-events: none;
-}
-.cert-cinta {
-  position: absolute; left: 0; right: 0; top: 0; height: 9px;
-  background: linear-gradient(90deg, var(--verde) 50%, var(--azul) 50%);
-}
-.cert-cabecera {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 1.5rem; padding-bottom: .9rem;
-  border-bottom: 2px solid #E3E9EE;
-}
-.cert-logueos { display: flex; align-items: center; gap: .9rem; }
-.cert-logueos img { height: 62px; width: 62px; object-fit: contain; }
-.cert-logueos .sep { width: 30px; height: 1px; background: #CBD5DD; }
-.cert-cabecera .texto { text-align: right; font-size: .74rem; color: #5A6875; line-height: 1.45; }
-.cert-cabecera .texto b { display: block; font-size: .82rem; color: var(--verde-oscuro); }
-
-.cert-cuerpo { flex: 1; text-align: center; padding: 1.1rem 0 .6rem; }
-.cert-titulo {
-  font-size: 1.5rem; letter-spacing: 5px; text-transform: uppercase;
-  color: var(--verde-oscuro); margin: 0 0 .1rem;
-}
-.cert-subtitulo { font-size: .92rem; color: #5A6875; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 1rem; }
-
-.cert-otorga { font-size: .95rem; color: #3D4A57; margin-bottom: .35rem; }
-.cert-nombre {
-  font-size: 2.15rem; font-weight: 700; color: var(--verde);
-  border-bottom: 2px solid #E3E9EE; display: inline-block;
-  padding: 0 2.4rem .12rem; margin: .15rem 0 .35rem; min-width: 420px;
-}
-.cert-nombre-vacio { color: #AEBAC4; font-style: italic; }
-.cert-documento { font-size: .88rem; color: #5A6875; margin-bottom: .8rem; }
-
-.cert-texto {
-  font-size: .95rem; color: #2B3742; max-width: 720px;
-  margin: 0 auto .9rem; line-height: 1.65;
-}
-.cert-texto .resaltado { font-weight: 700; color: var(--verde-oscuro); }
-
-.cert-temas {
-  max-width: 740px; margin: 0 auto;
-  font-size: .8rem; color: #5A6875; line-height: 1.5;
-  border-top: 1px solid #E3E9EE; border-bottom: 1px solid #E3E9EE;
-  padding: .5rem 0; margin-bottom: .9rem;
-}
-
-.cert-pie { display: flex; justify-content: space-between; align-items: flex-end; gap: 1.5rem; }
-.cert-firmas { display: flex; gap: 2.5rem; flex: 1; }
-.cert-firma { text-align: center; flex: 1; }
-.cert-firma .linea { border-top: 1px solid #1a1a1a; margin-bottom: .25rem; padding-top: .3rem; }
-.cert-firma strong { display: block; font-size: .84rem; }
-.cert-firma span { font-size: .74rem; color: #5A6875; }
-
-.cert-sello {
-  text-align: right; font-family: var(--fuente);
-  font-size: .74rem; color: #5A6875; line-height: 1.6;
-}
-.cert-sello .codigo {
-  display: inline-block; font-family: Consolas, "SF Mono", Menlo, monospace;
-  background: var(--verde-claro); border: 1px solid #B9D8C8;
-  color: var(--verde-oscuro); padding: .18rem .5rem;
-  border-radius: var(--radio-s); font-size: .78rem; font-weight: 700;
-  letter-spacing: .5px; margin-top: .2rem;
-}
 
 .info-certificado {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -595,26 +516,6 @@ table.datos td:first-child { font-weight: 600; color: var(--verde-oscuro); }
 /* Verificación                                                         */
 /* ------------------------------------------------------------------ */
 .verificar-form { max-width: 460px; margin: 0 auto; }
-.resultado-verif { text-align: center; padding: 1.2rem; }
-.resultado-verif .icono { font-size: 2.6rem; }
-.resultado-verif h3 { margin: .4rem 0; }
-
-/* ------------------------------------------------------------------ */
-/* Utilidades                                                           */
-/* ------------------------------------------------------------------ */
-.oculto { display: none !important; }
-.centrado { text-align: center; }
-.mb-0 { margin-bottom: 0 !important; }
-.mt-1 { margin-top: 1rem; }
-.mt-2 { margin-top: 1.6rem; }
-.texto-suave { color: var(--texto-suave); }
-.texto-peq { font-size: .82rem; }
-
-.pasos { counter-reset: paso; list-style: none; padding: 0; margin: 1rem 0; }
-.pasos li {
-  counter-increment: paso; position: relative;
-  padding-left: 2.3rem; margin-bottom: .7rem; font-size: .94rem;
-}
 .pasos li::before {
   content: counter(paso); position: absolute; left: 0; top: 0;
   width: 26px; height: 26px; border-radius: 50%;
@@ -635,12 +536,7 @@ table.datos td:first-child { font-weight: 600; color: var(--verde-oscuro); }
   .usuario-datos { display: none; }
   .resumen-fila { grid-template-columns: 1fr 60px; }
   .resumen-fila .nom { grid-column: 1 / -1; }
-  .eval-cabecera { position: static; }
-  .certificado { padding: 22px; height: auto; }
-  .cert-nombre { font-size: 1.5rem; min-width: 0; padding: 0 1rem .1rem; }
-  .cert-logueos img { height: 44px; width: 44px; }
-  .cert-firmas { gap: 1rem; }
-  .cert-titulo { font-size: 1.15rem; letter-spacing: 3px; }
+.eval-cabecera { position: static; }
 }
 
 @media (max-width: 560px) {
@@ -650,27 +546,110 @@ table.datos td:first-child { font-weight: 600; color: var(--verde-oscuro); }
   .indice-modulos { grid-template-columns: 1fr; }
   .navegacion-modulos { flex-direction: column; }
   .navegacion-modulos .btn { width: 100%; }
-  .cert-cabecera { flex-direction: column; text-align: center; }
-  .cert-cabecera .texto { text-align: center; }
-  .cert-pie { flex-direction: column; align-items: stretch; }
+}
+
+/* =========================================================================
+   LECTURA POR SECCIONES Y BLOQUEO DE LA EVALUACIÓN
+   ========================================================================= */
+
+.sec-contador {
+  display: inline-block; margin-bottom: .5rem;
+  font-size: .68rem; font-weight: 700; letter-spacing: .9px;
+  text-transform: uppercase; color: var(--verde-oscuro);
+  background: var(--verde-claro); border-radius: 999px; padding: .2rem .6rem;
+}
+
+.seccion-oculta { display: none; }
+
+.seccion-actual {
+  border-left: 4px solid var(--verde);
+  padding-left: .9rem;
+  margin-left: -.9rem;
+}
+
+.sec-pie {
+  margin-top: 1.1rem; padding-top: .7rem;
+  border-top: 1px dashed var(--borde);
+  font-size: .8rem; color: var(--verde-oscuro); font-weight: 600;
+}
+
+.caja-secciones {
+  margin-top: .9rem; padding: .55rem .8rem;
+  background: var(--verde-claro); border-radius: var(--radio);
+  font-size: .82rem; color: var(--verde-oscuro); font-weight: 600;
+}
+
+.pie-modulo { margin-top: 1.2rem; flex-wrap: wrap; }
+.pie-pendiente {
+  flex-basis: 100%; margin-top: .5rem;
+  font-size: .78rem; color: var(--texto-suave);
+}
+
+.btn-bloqueado { opacity: .55; cursor: not-allowed; }
+
+.pt-lectura { margin: .7rem 0 .2rem; }
+.pt-lectura-txt { font-size: .74rem; color: var(--texto-suave); }
+.pt-lectura-barra {
+  display: block; height: 6px; margin-top: .25rem;
+  background: var(--borde); border-radius: 999px; overflow: hidden;
+}
+.pt-lectura-barra i { display: block; height: 100%; background: var(--verde); }
+
+.lista-pendientes { margin: 1rem 0; text-align: left; }
+.pendiente-item {
+  display: grid; grid-template-columns: 1fr 90px 110px auto;
+  gap: .6rem; align-items: center;
+  padding: .6rem 0; border-bottom: 1px solid var(--borde);
+}
+.pendiente-titulo { font-weight: 600; font-size: .88rem; }
+.pendiente-barras { display: block; height: 6px; background: var(--borde); border-radius: 999px; overflow: hidden; }
+.pendiente-barras i { display: block; height: 100%; background: var(--verde); }
+.pendiente-txt { font-size: .74rem; color: var(--texto-suave); }
+@media (max-width: 640px) {
+  .pendiente-item { grid-template-columns: 1fr auto; }
+  .pendiente-barras, .pendiente-txt { grid-column: 1 / -1; }
+}
+
+/* =========================================================================
+   PANEL ADMINISTRATIVO
+   ========================================================================= */
+
+.admin-persona {
+  border: 1px solid var(--borde); border-radius: var(--radio);
+  margin-bottom: .6rem; background: var(--blanco);
+}
+.admin-persona > summary {
+  cursor: pointer; padding: .8rem .9rem; list-style: none;
+  display: grid; grid-template-columns: 1.4fr 1.4fr 1fr auto auto;
+  gap: .6rem; align-items: center; font-size: .82rem;
+}
+.admin-persona > summary::-webkit-details-marker { display: none; }
+.ap-nombre { font-weight: 700; }
+.ap-correo, .ap-datos { color: var(--texto-suave); font-size: .74rem; }
+.ap-estado { font-size: .74rem; font-weight: 600; color: var(--verde-oscuro); white-space: nowrap; }
+.ap-tiempo { font-size: .74rem; white-space: nowrap; }
+.admin-detalle { padding: .3rem .9rem 1rem; border-top: 1px solid var(--borde); }
+.admin-protocolos { margin: .6rem 0; display: flex; flex-wrap: wrap; gap: .35rem; }
+.admin-acciones { margin-top: .9rem; }
+
+.celda-centro { text-align: center; }
+.celda-ancho { width: 110px; }
+
+.btn-peq { padding: .3rem .6rem; font-size: .74rem; }
+.btn-mal { border-color: #b03030; color: #b03030; }
+.btn-mal:hover { background: #b03030; color: #fff; }
+
+@media (max-width: 760px) {
+  .admin-persona > summary { grid-template-columns: 1fr; gap: .2rem; }
 }
 
 /* ------------------------------------------------------------------ */
-/* Impresión: solo el certificado                                       */
+/* Impresión: solo el resultado                                        */
 /* ------------------------------------------------------------------ */
 @media print {
-  @page { size: landscape; margin: 8mm; }
-
   body { background: #fff !important; }
-  .banner-demo, .encabezado, .no-imprimir, .cert-lienzo > .no-imprimir { display: none !important; }
-
+  .banner-demo, .encabezado, .no-imprimir { display: none !important; }
   .envoltura { padding: 0 !important; max-width: none; }
-  .cert-lienzo { background: #fff !important; padding: 0 !important; border-radius: 0; }
-
-  .certificado {
-    width: 100%; height: auto; min-height: 190mm;
-    box-shadow: none; margin: 0; page-break-inside: avoid;
-  }
 }
 
 /* =========================================================================
@@ -832,11 +811,6 @@ table.datos td:first-child { font-weight: 600; color: var(--verde-oscuro); }
    SELECTOR DE PROTOCOLO (chips)
    ========================================================================= */
 
-.selector-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .5rem;
-}
 .chip {
   display: inline-flex;
   align-items: center;
@@ -1011,20 +985,10 @@ table.datos td:first-child { font-weight: 600; color: var(--verde-oscuro); }
 }
 .pt-pdf-inline:hover { background: rgba(255, 255, 255, .34); }
 
-.cert-nota-sin-firmas {
-  flex: 1 1 auto;
-  align-self: center;
-  max-width: 62%;
-  font-size: .74rem;
-  line-height: 1.4;
-  color: #55637a;
-  text-align: left;
-}
 
 @media (max-width: 640px) {
   .pt-pdf-inline { float: none; display: block; margin: .4rem 0 0; }
-  .cert-nota-sin-firmas { max-width: none; text-align: center; margin-bottom: .6rem; }
-}
+  }
 
 /* =========================================================================
    DETALLE DE INTENTOS (registro institucional)
