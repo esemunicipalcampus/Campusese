@@ -145,9 +145,9 @@ code {
 .tarjeta h2, .tarjeta h3 { margin-top: 0; }
 
 /* ------------------------------------------------------------------ */
-/* Portada                                                              */
+/* Portada: bloque con color, degradado institucional y formas suaves      */
 /* ------------------------------------------------------------------ */
-.portada { text-align: center; padding: .5rem 0 0; }
+.portada { position: relative; margin-bottom: 1.4rem; }
 .portada-doble {
   display: flex; justify-content: center; align-items: center;
   gap: 1.5rem; margin-bottom: .5rem; flex-wrap: wrap;
@@ -155,12 +155,95 @@ code {
 .portada-doble img { height: 96px; width: 96px; object-fit: contain; }
 .portada-doble .sep { width: 44px; height: 2px; background: var(--borde); }
 
-.portada h1 {
-  font-size: 2.15rem; margin-bottom: .35rem;
-  background: linear-gradient(100deg, var(--verde), var(--azul));
-  -webkit-background-clip: text; background-clip: text; color: transparent;
+/* Capa de color de fondo: degradado + dos manchas suaves */
+.portada-fondo {
+  position: absolute; inset: -1.2rem -1.2rem auto; height: 100%;
+  border-radius: 22px; overflow: hidden; z-index: 0;
+  background:
+    radial-gradient(680px 320px at 12% -10%, rgba(224, 192, 0, .22), transparent 62%),
+    radial-gradient(620px 340px at 92% 8%, rgba(192, 48, 96, .18), transparent 60%),
+    linear-gradient(135deg, #1B3A6B 0%, #306090 48%, #2C6E8F 100%);
+  box-shadow: var(--sombra-f);
 }
-.portada .subtitulo { color: var(--texto-suave); font-size: 1.05rem; margin-bottom: 1.1rem; }
+.portada-fondo::after {
+  content: ""; position: absolute; inset: 0;
+  background-image:
+    radial-gradient(rgba(255, 255, 255, .10) 1px, transparent 1px),
+    radial-gradient(rgba(255, 255, 255, .07) 1px, transparent 1px);
+  background-size: 26px 26px, 44px 44px;
+  background-position: 0 0, 13px 22px;
+}
+
+.portada-cuerpo {
+  position: relative; z-index: 1;
+  padding: 2.5rem 1.6rem 2.6rem; text-align: center;
+}
+
+.portada-sello {
+  display: inline-block; margin: 0 0 .9rem;
+  background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .3);
+  color: #fff; border-radius: 999px; padding: .3rem .95rem;
+  font-size: .72rem; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase;
+  backdrop-filter: blur(3px);
+}
+
+.portada h1 {
+  font-size: 2.5rem; line-height: 1.15; margin: 0 0 .5rem;
+  color: #fff; text-shadow: 0 2px 14px rgba(9, 24, 45, .35);
+}
+.portada .subtitulo {
+  color: rgba(255, 255, 255, .9); font-size: 1.02rem; font-weight: 500;
+  margin: 0 auto 1rem; max-width: 46rem; line-height: 1.5;
+}
+.portada-bajada {
+  color: rgba(255, 255, 255, .82); font-size: .93rem;
+  max-width: 40rem; margin: 0 auto 1.5rem;
+}
+
+/* Chips de los cuatro protocolos */
+.portada-chips {
+  display: flex; justify-content: center; flex-wrap: wrap;
+  gap: .55rem; margin-bottom: 1.7rem;
+}
+.chip-protocolo {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .45rem 1rem; border-radius: 999px;
+  font-size: .85rem; font-weight: 600; text-decoration: none;
+  color: #fff; border: 1px solid rgba(255, 255, 255, .28);
+  background: rgba(255, 255, 255, .12);
+  transition: transform .15s, background .15s, box-shadow .15s;
+}
+.chip-protocolo:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, .24);
+  box-shadow: 0 6px 18px rgba(9, 24, 45, .28);
+  color: #fff;
+}
+.chip-1 { box-shadow: inset 0 -3px 0 #E0C000; }
+.chip-2 { box-shadow: inset 0 -3px 0 #C03060; }
+.chip-3 { box-shadow: inset 0 -3px 0 #16A06B; }
+.chip-4 { box-shadow: inset 0 -3px 0 #4C8FD6; }
+
+/* Botones de la portada */
+.portada-acciones {
+  display: flex; justify-content: center; align-items: center;
+  gap: .8rem; flex-wrap: wrap;
+}
+.btn-claro {
+  background: #fff; color: var(--azul); border-color: #fff;
+  box-shadow: 0 4px 16px rgba(9, 24, 45, .22);
+  padding: .8rem 1.6rem; font-size: .98rem;
+}
+.btn-claro:hover { background: #F2F6FB; border-color: #F2F6FB; color: var(--azul-oscuro); }
+.btn-coordinacion {
+  background: rgba(255, 255, 255, .14); color: #fff;
+  border: 1px solid rgba(255, 255, 255, .45);
+  padding: .8rem 1.5rem; font-size: .95rem;
+}
+.btn-coordinacion:hover {
+  background: var(--magenta); border-color: var(--magenta); color: #fff;
+}
+.btn-coordinacion .ico { font-size: 1rem; }
 
 .etiquetas { display: flex; justify-content: center; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.3rem; }
 .etiqueta {
@@ -170,16 +253,25 @@ code {
 }
 .etiqueta.azul { background: var(--azul-claro); color: var(--azul-oscuro); }
 
+/* Fichas de cifras (perfil y panel). NO es la portada. */
 .datos-curso {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: .8rem; margin: 1.2rem 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: .7rem; margin: 1.1rem 0;
 }
 .dato {
   background: var(--blanco); border: 1px solid var(--borde);
-  border-radius: var(--radio); padding: .85rem .7rem;
+  border-left: 4px solid var(--verde);
+  border-radius: var(--radio); padding: .75rem .85rem;
+  box-shadow: var(--sombra);
 }
-.dato strong { display: block; font-size: 1.4rem; color: var(--verde); line-height: 1.1; }
-.dato span { font-size: .76rem; color: var(--texto-suave); text-transform: uppercase; letter-spacing: .4px; }
+.dato strong {
+  display: block; font-size: 1.3rem; line-height: 1.15;
+  color: var(--verde-oscuro); font-weight: 700;
+}
+.dato span {
+  font-size: .7rem; color: var(--texto-suave);
+  text-transform: uppercase; letter-spacing: .5px; font-weight: 600;
+}
 
 /* ------------------------------------------------------------------ */
 /* Acceso / registro                                                    */
@@ -541,7 +633,15 @@ table.datos td:first-child { font-weight: 600; color: var(--verde-oscuro); }
 
 @media (max-width: 560px) {
   .envoltura { padding: 1rem .8rem 3rem; }
-  .portada h1 { font-size: 1.6rem; }
+  .portada-fondo { inset: -.7rem -.5rem auto; border-radius: 16px; }
+  .portada-cuerpo { padding: 1.9rem 1rem 2rem; }
+  .portada h1 { font-size: 1.75rem; }
+  .portada .subtitulo { font-size: .92rem; }
+  .portada-bajada { font-size: .86rem; margin-bottom: 1.2rem; }
+  .portada-chips { gap: .4rem; margin-bottom: 1.3rem; }
+  .chip-protocolo { font-size: .78rem; padding: .38rem .75rem; }
+  .portada-acciones { flex-direction: column; align-items: stretch; }
+  .portada-acciones .btn { width: 100%; }
   .marca .separador { display: none; }
   .indice-modulos { grid-template-columns: 1fr; }
   .navegacion-modulos { flex-direction: column; }

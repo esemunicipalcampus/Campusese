@@ -16,9 +16,30 @@
 
   <!-- ===================== PORTADA ===================== -->
   <section class="portada">
-    <h1 id="tituloPortada">Campus Virtual ESE Municipal</h1>
-    <p class="subtitulo" id="subtituloPortada"></p>
-    <div class="datos-curso" id="datosCurso"></div>
+    <div class="portada-fondo" aria-hidden="true"></div>
+    <div class="portada-cuerpo">
+      <p class="portada-sello">ESE Municipal de Villavicencio</p>
+      <h1 id="tituloPortada">Campus Virtual ESE Municipal</h1>
+      <p class="subtitulo" id="subtituloPortada"></p>
+      <p class="portada-bajada">
+        Capacitación en los cuatro protocolos de seguridad del paciente.
+        Lee cada módulo, marca las secciones y presenta la evaluación de cada uno.
+      </p>
+
+      <div class="portada-chips">
+        <a class="chip-protocolo chip-1" href="protocolos.html">Código Azul</a>
+        <a class="chip-protocolo chip-2" href="protocolos.html">Carro de Paro</a>
+        <a class="chip-protocolo chip-3" href="protocolos.html">Ronda de Seguridad</a>
+        <a class="chip-protocolo chip-4" href="protocolos.html">Entrega de Turno</a>
+      </div>
+
+      <div class="portada-acciones">
+        <a href="protocolos.html" class="btn btn-claro">Comenzar la capacitación</a>
+        <a href="admin.html" class="btn btn-coordinacion">
+          <span class="ico">🔐</span> Entrar al panel administrativo
+        </a>
+      </div>
+    </div>
   </section>
 
   <!-- ===================== ACCESO / REGISTRO ===================== -->
@@ -29,7 +50,7 @@
 <footer class="no-imprimir" style="text-align:center;padding:1.5rem 1rem 2.5rem;color:var(--texto-suave);font-size:.82rem;border-top:1px solid var(--borde)">
   <strong>ESE Municipal de Villavicencio</strong> · Empresa Social del Estado del Municipio de Villavicencio<br>
   Universidad de los Llanos · Ruralito Unillanos<br>
-  <a href="admin.html" style="color:var(--texto-suave)">Acceso de coordinación</a>
+  <a href="admin.html">Acceso de coordinación</a>
 </footer>
 
 <script src="assets/js/config.js"></script>
@@ -48,20 +69,6 @@
 
   /* ---------- textos de portada ---------- */
   document.getElementById("subtituloPortada").textContent = C.programa.subtitulo;
-
-  const prots = A.protocolos();
-  const nTemas = window.TEMAS ? window.TEMAS.length : 0;
-  const nModulos = window.CURSO ? window.CURSO.modulos.length : 0;
-  const nPreguntas = window.BancoPreguntas ? window.BancoPreguntas.total() : 0;
-  const horasTotal = prots.reduce((s, p) => s + Number(p.horas || 0), 0);
-
-  document.getElementById("datosCurso").innerHTML = [
-    [prots.length, "Protocolos"],
-    [nModulos, "Módulos de estudio"],
-    [nTemas, "Temas de evaluación"],
-    [nPreguntas, "Preguntas"],
-    [horasTotal + " h", "Duración total"],
-  ].map(([v, t]) => `<div class="dato"><strong>${A.esc(v)}</strong><span>${A.esc(t)}</span></div>`).join("");
 
   /* ---------- ficha mínima: sede y cargo ----------
      El nombre y el correo YA VINIERON de Google: no se vuelven a pedir.
