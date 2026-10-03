@@ -1,4 +1,4 @@
-/* =========================================================================
+﻿/* =========================================================================
  * CONFIGURACIÓN GENERAL
  * ESE Municipal de Villavicencio  ×  Universidad de los Llanos
  * -------------------------------------------------------------------------
@@ -194,15 +194,32 @@ window.CONFIG = {
    * --------------------------------------------------------------------
    * 'local' → todo queda en el navegador (funciona sin backend)
    * 'sheet' → además envía los registros a Google Sheets
+   *
+   * PENDIENTE: está en "local" a propósito. La URL de abajo ya funciona y la
+   * contraseña del panel ya valida contra el servidor, pero el código
+   * desplegado en Apps Script es una versión vieja que falla al leer la hoja
+   * ("getSpreadsheet is not a function"). Con 'sheet' activo, el registro
+   * público se caería.
+   *
+   * Para activarlo: copia el Code.gs de este repositorio (ya corregido) en
+   * script.google.com, crea una implementación nueva y cambia aquí
+   * almacenamiento a "sheet".
    * ------------------------------------------------------------------ */
   almacenamiento: "local",
 
-  /* URL del Web App de Google Apps Script (opcional).
-   * Se obtiene en: Implementar → Nueva implementación → Aplicación web. */
-  appsScriptUrl: "",
+  /* URL del Web App de Google Apps Script.
+   * Se obtiene en: Implementar → Nueva implementación → Aplicación web,
+   * con "Quién tiene acceso: Cualquier persona".
+   * Debe empezar por https://script.google.com/macros/s/ y terminar en /exec.
+   * Si aparece "a/macros/dominio" adelante, está restringida y no funciona. */
+  appsScriptUrl: "https://script.google.com/macros/s/AKfycbxSgwJSK0XA6yYmgaa9KjLpU8HPijWee70R7AO1XyErzqaluhjJAJSpWwIpzojeyvO5cw/exec",
 
-  /* Clave compartida para que solo este sitio escriba en la hoja. */
-  appsScriptSecret: "",
+  /* Clave compartida para que solo este sitio escriba en la hoja.
+   * OJO: este archivo es público, así que esta clave NO es un secreto real.
+   * Sirve para evitar escrituras por accidente o de bots que no revisen el
+   * código. Quien quiera bloquear de verdad el acceso debe poner la clave en
+   * Apps Script (Propiedades de secuencia de comandos), no aquí. */
+  appsScriptSecret: "2k5R*PtvJ#%gSW4UE4&$#AtfcaQM$BujAmjD!iXG",
 
   /* --------------------------------------------------------------------
    * 8) CLAVES DE ALMACENAMIENTO LOCAL

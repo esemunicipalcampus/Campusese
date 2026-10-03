@@ -244,7 +244,7 @@
         if (!r || r.ok !== true) {
           btn.dataset.confirmar = "";
           btn.textContent = "Borrar todo el progreso de esta persona";
-          A.aviso(r && r.mensaje ? r.mensaje : "No se pudo borrar.", "error");
+          A.aviso(explicar(r, "No se pudo borrar."), "error", 9000);
           return;
         }
         A.aviso("Progreso de " + correo + " borrado.", "ok");
@@ -253,12 +253,29 @@
     });
   }
 
+  /* Traduce la respuesta del servidor a algo que un administrador pueda
+     entender. Un error técnico del backend no se esconde detrás de
+     "la sesión expiró". */
+  function explicar(r, porDefecto) {
+    if (!r) return porDefecto;
+    if (r.mensaje) return r.mensaje;
+    if (r.error) {
+      if (/getSpreadsheet is not a function/i.test(r.error)) {
+        return "El backend desplegado tiene una versión vieja. Vuelve a copiar "
+          + "apps-script/Code.gs en script.google.com y crea una implementación "
+          + "nueva (Implementar → Nueva implementación → Aplicación web).";
+      }
+      return "El servidor devolvió un error: " + r.error;
+    }
+    return porDefecto;
+  }
+
   async function cargar() {
     if (!token) return pintarAcceso();
     const r = await A.Remoto.adminProgreso(token);
     if (!r || r.ok !== true) {
       guardarToken(null);
-      return pintarAcceso(r && r.mensaje ? r.mensaje : "La sesión expiró. Vuelve a entrar.");
+      return pintarAcceso(explicar(r, "La sesión expiró. Vuelve a entrar."));
     }
     datos = r;
     pintar();

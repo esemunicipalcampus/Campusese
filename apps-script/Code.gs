@@ -33,8 +33,10 @@
  * CONFIGURACIÓN
  * ------------------------------------------------------------------ */
 
-/** Código de acceso del registro institucional (registro.html). */
-var CLAVE = "CLAVE_SECRETA_LARGA_Y_UNICA_AQUI";
+/** Clave compartida que envía el sitio (config.js → appsScriptSecret).
+ *  Evita escrituras accidentales o de bots que no revisen el código.
+ *  No es un secreto fuerte: este repositorio es público. */
+var CLAVE = "2k5R*PtvJ#%gSW4UE4&$#AtfcaQM$BujAmjD!iXG";
 
 /** Contraseña MAESTRA del panel administrativo (admin.html).
  *  Se compara aquí, en el servidor, nunca en el navegador.
@@ -670,8 +672,19 @@ function obtenerSpreadsheet() {
 }
 
 function buscarPorNombre(nombre) {
+  /* DriveApp.getFilesByName devuelve CUALQUIER archivo con ese nombre: carpetas,
+     proyectos de script y otros. Antes setomaba el primero y se le llamaba
+     getSpreadsheet(), que reventaba con
+     "archivos.next(...).getSpreadsheet is not a function".
+     Ahora se filtra por tipo de archivo y se abre por ID. */
   var archivos = DriveApp.getFilesByName(nombre);
-  return archivos.hasNext() ? archivos.next().getSpreadsheet() : null;
+  while (archivos.hasNext()) {
+    var archivo = archivos.next();
+    if (archivo.getMimeType() === "application/vnd.google-apps.spreadsheet") {
+      return SpreadsheetApp.openById(archivo.getId());
+    }
+  }
+  return null;
 }
 
 /** Ejecuta esta función UNA VEZ desde el editor para crear las pestañas. */
