@@ -102,8 +102,8 @@
     if (r && r.motivo === "deshabilitado") {
       return "El registro central no está conectado, así que no se puede verificar "
         + "ninguna contraseña. En assets/js/config.js faltan almacenamiento: \"sheet\" "
-        + "y appsScriptUrl. La contraseña 130004708 es la del backend: solo empieza "
-        + "a funcionar cuando el Apps Script esté desplegado.";
+        + "y appsScriptUrl. El panel solo entra cuando el Apps Script está desplegado "
+        + "y tiene la contraseña maestra guardada en sus propiedades.";
     }
     if (r && r.motivo === "sin-red") {
       return "No hubo respuesta del servidor. Revisa tu conexión o el despliegue del Apps Script.";
