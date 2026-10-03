@@ -1,4 +1,4 @@
-/* =========================================================================
+﻿/* =========================================================================
  * PANEL ADMINISTRATIVO
  * -------------------------------------------------------------------------
  * Solo entra quien conozca la contraseña maestra. La contraseña NO está en
@@ -15,6 +15,14 @@
 
   let token = null;
   let datos = null;
+
+  /* Filtros, orden y forma de ver la lista. Vive aquí porque los botones
+     de Excel deben sacar exactamente lo que hay en pantalla. */
+  const estado = {
+    q: "", sede: "", cargo: "", estado: "", protocolo: "",
+    orden: { col: "nombre", dir: 1 },
+    vista: "tabla",
+  };
 
   /* ------------------------------------------------------------------ */
   /* Sesión del administrador                                            */
@@ -44,6 +52,15 @@
           En <code>assets/js/config.js</code> faltan <code>almacenamiento: "sheet"</code>
           y <code>appsScriptUrl</code>. Sin eso el panel no tiene datos de otras
           personas: solo verías lo guardado en este navegador.
+        </div>` : ""}
+
+        ${mensaje && /propiedades de secuencia de comandos/i.test(mensaje) ? `
+        <div class="aviso aviso-alerta">
+          <strong>El panel todavía no tiene contraseña maestra</strong>
+          Ya no está escrita en el sitio, por seguridad. Crear la contraseña es
+          una sola vez, en Google Apps Script: <b>Configuración del proyecto →
+          Propiedades de secuencia de comandos → Agregar</b>, con el nombre
+          <code>CLAVE_ADMIN</code> y como valor la contraseña que quieras usar.
         </div>` : ""}
 
         <form id="formAcceso" novalidate>
@@ -113,37 +130,336 @@
     return `<span class="pt-lectura-barra"><i style="width:${v}%"></i></span>`;
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Filtros, estados y orden                                            */
+  /* ------------------------------------------------------------------ */
+
+  /* Los cuatro estados que de verdad sirven para perseguir a alguien.
+     Se calculan aquí y no vienen del servidor, para que la tabla, los
+     filtros y el Excel salgan siempre con lo mismo. */
+  const ESTADOS = [
+    { id: "sin-iniciar", txt: "Sin iniciar", pill: "pill-neutro" },
+    { id: "en-curso", txt: "En curso", pill: "pill-avanzando" },
+    { id: "lectura-completa", txt: "Terminó la lectura", pill: "pill-mal" },
+    { id: "aprobado", txt: "Aprobó los 4", pill: "pill-ok" },
+  ];
+
+  function totalModulosCurso() {
+    return (window.CURSO && window.CURSO.modulos) ? window.CURSO.modulos.length : 0;
+  }
+
+  function estadoDe(p) {
+    const leidos = (p.modulos || []).filter((m) => m.completo).length;
+    if ((p.aprobados || 0) >= (p.totalProtocolos || 0)) return "aprobado";
+    if (leidos === 0 && !p.tiempoTotal) return "sin-iniciar";
+    if (totalModulosCurso() && leidos >= totalModulosCurso()) return "lectura-completa";
+    return "en-curso";
+  }
+
+  function estadoInfo(id) {
+    return ESTADOS.find((e) => e.id === id) || ESTADOS[0];
+  }
+
+  /** Marca de tiempo de la última actividad de la persona. */
+  function ultimoAvance(p) {
+    let max = 0;
+    (p.modulos || []).forEach((m) => {
+      const t = Date.parse(m.actualizado || "") || 0;
+      if (t > max) max = t;
+    });
+    return max;
+  }
+
+  function fechaCorta(t) {
+    if (!t) return "—";
+    const d = new Date(t);
+    if (isNaN(d)) return "—";
+    return d.toLocaleDateString("es-CO", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  }
+
+  function sinAcento(s) {
+    return String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  }
+
+  function coincide(p, q) {
+    if (!q) return true;
+    return sinAcento([p.nombre, p.correo, p.sede, p.cargo, p.dependencia, p.telefono].join(" "))
+      .includes(sinAcento(q));
+  }
+
+  /** Aplica buscador + filtros. Devuelve la lista que se ve y la que se exporta. */
+  function filtrar() {
+    let filas = (datos && datos.participantes) || [];
+    const f = estado;
+
+    if (f.q) filas = filas.filter((p) => coincide(p, f.q));
+    if (f.sede) filas = filas.filter((p) => (p.sede || "—") === f.sede);
+    if (f.cargo) filas = filas.filter((p) => (p.cargo || "—") === f.cargo);
+    if (f.estado) filas = filas.filter((p) => estadoDe(p) === f.estado);
+    if (f.protocolo) {
+      filas = filas.filter((p) => (p.protocolos || []).some((x) => x.id === f.protocolo && x.aprobado));
+    }
+
+    /* Se busca por id, no por el objeto entero: si no, ninguna columna
+       coincidiría y la lista saldría siempre ordenada por nombre. */
+    const col = COLUMNAS.find((c) => c.id === f.orden.col) || COLUMNAS[0];
+    const dir = f.orden.dir;
+    return filas.slice().sort((a, b) => {
+      const va = col.valor(a);
+      const vb = col.valor(b);
+      if (col.num) return (va - vb) * dir;
+      return String(va).localeCompare(String(vb), "es") * dir;
+    });
+  }
+
+  /** Opciones de un desplegable, a partir de lo que hay en los datos. */
+  function opciones(campo) {
+    const vistos = [];
+    ((datos && datos.participantes) || []).forEach((p) => {
+      const v = campo === "sede" ? (p.sede || "—") : (p.cargo || "—");
+      if (!vistos.includes(v)) vistos.push(v);
+    });
+    return vistos.sort((a, b) => a.localeCompare(b, "es"));
+  }
+
+  const COLUMNAS = [
+    { id: "nombre", txt: "Nombre", valor: (p) => p.nombre || "" },
+    { id: "sede", txt: "Sede", valor: (p) => p.sede || "" },
+    { id: "cargo", txt: "Cargo", valor: (p) => p.cargo || "" },
+    { id: "estado", txt: "Estado", valor: (p) => estadoInfo(estadoDe(p)).txt },
+    { id: "aprobados", txt: "Aprobados", valor: (p) => p.aprobados || 0, num: true },
+    { id: "avance", txt: "Avance", valor: (p) => p.avanceLectura || 0, num: true },
+    { id: "tiempo", txt: "Tiempo", valor: (p) => p.tiempoTotal || 0, num: true },
+    { id: "ultimo", txt: "Última actividad", valor: ultimoAvance, num: true },
+  ];
+
   function pintar() {
-    const filas = (datos && datos.participantes) || [];
+    const total = ((datos && datos.participantes) || []).length;
+    const visibles = filtrar().length;
 
     /* Cifras reales del curso, leidas de la misma fuente que usa el sitio.
        No van escritas a mano para que no se desactualicen. */
     const protocolos = (C.protocolos || []).length;
-    const modulos = (window.CURSO && window.CURSO.modulos) ? window.CURSO.modulos.length : 0;
+    const modulos = totalModulosCurso();
     const temas = window.TEMAS ? window.TEMAS.length : 0;
     const preguntas = window.BancoPreguntas ? window.BancoPreguntas.total() : 0;
     const horas = (C.protocolos || []).reduce((s, p) => s + Number(p.horas || 0), 0);
 
-    const contenido = `
-      <h2 class="admin-seccion">Contenido del curso</h2>
-      <div class="contenido-curso">
-        <div class="cc cc-azul"><span class="cc-num">${A.esc(protocolos)}</span><span class="cc-txt">Protocolos</span></div>
-        <div class="cc cc-magenta"><span class="cc-num">${A.esc(modulos)}</span><span class="cc-txt">Módulos de estudio</span></div>
-        <div class="cc cc-verde"><span class="cc-num">${A.esc(temas)}</span><span class="cc-txt">Temas de evaluación</span></div>
-        <div class="cc cc-amarillo"><span class="cc-num">${A.esc(preguntas)}</span><span class="cc-txt">Preguntas</span></div>
-        <div class="cc cc-cian"><span class="cc-num">${A.esc(horas)} h</span><span class="cc-txt">Duración total</span></div>
-      </div>
-
-      <h2 class="admin-seccion">Actividad de los participantes</h2>
-      <div class="datos-curso" style="margin:.6rem 0 1rem">
-        <div class="dato"><strong>${filas.length}</strong><span>Participantes</span></div>
-        <div class="dato"><strong>${(datos && datos.aprobados) || 0}</strong><span>Protocolos aprobados</span></div>
-        <div class="dato"><strong>${(datos && datos.intentos) || 0}</strong><span>Intentos totales</span></div>
-        <div class="dato"><strong>${A.esc(minutos((datos && datos.tiempoTotal) || 0))}</strong><span>Tiempo de estudio</span></div>
+    const filtro = (id, etiqueta, opciones_, actual) => `
+      <div class="campo">
+        <label for="${id}">${etiqueta}</label>
+        <select id="${id}">
+          <option value="">Todos</option>
+          ${opciones_.map((o) => `<option value="${A.esc(o.id || o)}"${actual === (o.id || o) ? " selected" : ""}>${A.esc(o.txt || o)}</option>`).join("")}
+        </select>
       </div>`;
 
-    const cuerpo = filas.length ? filas.map(function (p) {
-      const modulos = (p.modulos || []).map(function (m) {
+    cont.innerHTML = `
+      <div class="tarjeta">
+        <div class="fila-top admin-cabecera">
+          <div>
+            <h1 style="margin:0">Panel administrativo</h1>
+            <p class="texto-peq texto-suave" style="margin:.2rem 0 0">
+              <a href="index.html" class="enlace-volver">&larr; Volver al inicio</a>
+            </p>
+          </div>
+          <div class="admin-cabecera-botones">
+            <button type="button" class="btn btn-borde" id="btnExcel">Descargar Excel</button>
+            <button type="button" class="btn btn-borde" id="btnSalirAdmin">Salir</button>
+          </div>
+        </div>
+
+        <h2 class="admin-seccion">Contenido del curso</h2>
+        <div class="contenido-curso">
+          <div class="cc cc-azul"><span class="cc-num">${A.esc(protocolos)}</span><span class="cc-txt">Protocolos</span></div>
+          <div class="cc cc-magenta"><span class="cc-num">${A.esc(modulos)}</span><span class="cc-txt">Módulos de estudio</span></div>
+          <div class="cc cc-verde"><span class="cc-num">${A.esc(temas)}</span><span class="cc-txt">Temas de evaluación</span></div>
+          <div class="cc cc-amarillo"><span class="cc-num">${A.esc(preguntas)}</span><span class="cc-txt">Preguntas</span></div>
+          <div class="cc cc-cian"><span class="cc-num">${A.esc(horas)} h</span><span class="cc-txt">Duración total</span></div>
+        </div>
+
+        <h2 class="admin-seccion">Actividad de los participantes</h2>
+        <div class="datos-curso" style="margin:.6rem 0 1rem">
+          <div class="dato"><strong>${total}</strong><span>Participantes</span></div>
+          <div class="dato"><strong>${(datos && datos.aprobados) || 0}</strong><span>Protocolos aprobados</span></div>
+          <div class="dato"><strong>${(datos && datos.intentos) || 0}</strong><span>Intentos totales</span></div>
+          <div class="dato"><strong>${A.esc(minutos((datos && datos.tiempoTotal) || 0))}</strong><span>Tiempo de estudio</span></div>
+        </div>
+
+        <div class="admin-filtros">
+          <div class="campo campo-ancho">
+            <label for="buscarAdmin">Buscar por nombre, correo o cargo</label>
+            <input type="search" id="buscarAdmin" value="${A.esc(estado.q)}" placeholder="Escribe para filtrar…">
+          </div>
+          ${filtro("fSede", "Sede", opciones("sede"), estado.sede)}
+          ${filtro("fCargo", "Cargo", opciones("cargo"), estado.cargo)}
+          ${filtro("fEstado", "Estado", ESTADOS, estado.estado)}
+          <div class="campo">
+            <label for="fProtocolo">Aprobó el protocolo</label>
+            <select id="fProtocolo">
+              <option value="">Todos</option>
+              ${(C.protocolos || []).map((pr) => `<option value="${A.esc(pr.id)}"${estado.protocolo === pr.id ? " selected" : ""}>${A.esc(pr.nombre)}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+
+        <div class="admin-lista-cabecera">
+          <p class="texto-peq texto-suave" style="margin:0">
+            Mostrando <strong id="cuentaVisibles">${visibles}</strong> de ${total} personas.
+            El Excel sale con estos mismos filtros.
+          </p>
+          <div class="admin-vistas" role="group" aria-label="Forma de ver la lista">
+            <button type="button" class="btn btn-mini${estado.vista === "tabla" ? " btn-activo" : ""}" data-vista="tabla">Tabla</button>
+            <button type="button" class="btn btn-mini${estado.vista === "tarjetas" ? " btn-activo" : ""}" data-vista="tarjetas">Tarjetas</button>
+            <button type="button" class="btn btn-mini" id="btnLimpiar">Limpiar filtros</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Participantes</h2>
+        <div id="listaAdmin"></div>
+      </div>
+
+      ${seccionClave()}`;
+
+    /* ---- eventos ---- */
+    document.getElementById("btnSalirAdmin").addEventListener("click", function () {
+      guardarToken(null);
+      pintarAcceso();
+    });
+
+    const excel = document.getElementById("btnExcel");
+    excel.addEventListener("click", function () {
+      excel.disabled = true;
+      try {
+        descargarExcel();
+      } finally {
+        excel.disabled = false;
+      }
+    });
+
+    document.getElementById("btnLimpiar").addEventListener("click", function () {
+      estado.q = ""; estado.sede = ""; estado.cargo = "";
+      estado.estado = ""; estado.protocolo = "";
+      pintar();
+    });
+
+    ["fSede", "fCargo", "fEstado", "fProtocolo"].forEach(function (id) {
+      document.getElementById(id).addEventListener("change", function (ev) {
+        estado[id.replace("f", "").toLowerCase()] = ev.target.value;
+        pintarLista();
+      });
+    });
+
+    const buscar = document.getElementById("buscarAdmin");
+    let reloj;
+    buscar.addEventListener("input", function () {
+      estado.q = buscar.value.trim();
+      /* Se espera a que dejes de escribir: con 200 personas no hace falta
+         repintar en cada tecla. */
+      clearTimeout(reloj);
+      reloj = setTimeout(pintarLista, 180);
+    });
+
+    A.$$("[data-vista]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        estado.vista = btn.getAttribute("data-vista");
+        pintar();
+      });
+    });
+
+    const formClave = document.getElementById("formClave");
+    if (formClave) formClave.addEventListener("submit", cambiarClave);
+
+    pintarLista();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Lista: tabla o tarjetas                                             */
+  /* ------------------------------------------------------------------ */
+  function pintarLista() {
+    const zona = document.getElementById("listaAdmin");
+    if (!zona) return;
+    const filas = filtrar();
+    const cuenta = document.getElementById("cuentaVisibles");
+    if (cuenta) cuenta.textContent = filas.length;
+
+    if (!filas.length) {
+      zona.innerHTML = '<div class="vacio">No hay participantes que cumplan estos filtros.</div>';
+      return;
+    }
+
+    zona.innerHTML = estado.vista === "tarjetas" ? tablaTarjetas(filas) : tablaDatos(filas);
+
+    /* Los eventos se enganchan aquí y no en pintar(): la lista se repinta
+       con cada filtro, así que volver a engancharlos en otro sitio los
+       dejaría duplicados. */
+
+    /* Los eventos de orden y de borrado se delegan desde el contenedor,
+       porque la lista se repinta con cada filtro. */
+    A.$$("[data-orden]", zona).forEach(function (th) {
+      th.addEventListener("click", function () {
+        const col = th.getAttribute("data-orden");
+        if (estado.orden.col === col) estado.orden.dir = -estado.orden.dir;
+        else estado.orden = { col: col, dir: 1 };
+        pintarLista();
+      });
+    });
+    A.$$("[data-borrar]", zona).forEach(function (btn) {
+      btn.addEventListener("click", function () { confirmarBorrado(btn); });
+    });
+  }
+
+  function tablaDatos(filas) {
+    const flecha = (id) => estado.orden.col === id ? (estado.orden.dir > 0 ? " ▲" : " ▼") : "";
+
+    const cab = COLUMNAS.map((c) => `
+      <th data-orden="${c.id}" class="${c.num ? "celda-centro" : ""}" title="Ordenar por ${A.esc(c.txt.toLowerCase())}">
+        ${A.esc(c.txt)}${flecha(c.id)}
+      </th>`).join("");
+
+    const cuerpo = filas.map((p) => {
+      const est = estadoInfo(estadoDe(p));
+      const prots = (p.protocolos || []).map((x) => `${A.esc(x.nombre)} ${x.mejor}%`).join(" · ") || "—";
+      return `<tr class="admin-fila">
+        <td>
+          <span class="af-nombre">${A.esc(p.nombre || "(sin nombre)")}</span>
+          <span class="af-correo">${A.esc(p.correo)}</span>
+        </td>
+        <td>${A.esc(p.sede || "—")}</td>
+        <td>${A.esc(p.cargo || "—")}</td>
+        <td class="celda-centro"><span class="pill-est ${est.pill}">${A.esc(est.txt)}</span></td>
+        <td class="celda-centro"><strong>${p.aprobados || 0}</strong>/${p.totalProtocolos || 0}</td>
+        <td class="celda-centro celda-ancho">
+          ${barra(p.avanceLectura)} ${Math.round(p.avanceLectura) || 0}%
+        </td>
+        <td class="celda-centro">${A.esc(minutos(p.tiempoTotal))}</td>
+        <td class="celda-centro">${A.esc(fechaCorta(ultimoAvance(p)))}</td>
+        <td class="texto-peq">${prots}</td>
+        <td class="celda-centro">
+          <button type="button" class="btn btn-mini btn-mal" data-borrar="${A.esc(p.correo)}">Borrar</button>
+        </td>
+      </tr>`;
+    }).join("");
+
+    return `
+      <div class="tabla-envoltura">
+        <table class="datos tabla-admin">
+          <thead><tr>${cab}<th class="celda-centro">Notas</th><th class="celda-centro">Avance</th></tr></thead>
+          <tbody>${cuerpo}</tbody>
+        </table>
+      </div>
+      <p class="texto-peq texto-suave">
+        Pasa el cursor por el encabezado para cambiar el orden.
+      </p>`;
+  }
+
+  /* La vista de tarjetas se conserva: sirve para leer el detalle de una persona. */
+  function tablaTarjetas(filas) {
+    return filas.map(function (p) {
+      const est = estadoInfo(estadoDe(p));
+      const modulos = (p.modulos || []).map((m) => {
         const pct = m.total ? Math.round((m.hechas / m.total) * 100) : 0;
         return `<tr>
           <td>${m.numero}. ${A.esc(m.titulo)}</td>
@@ -154,10 +470,8 @@
         </tr>`;
       }).join("");
 
-      const protos = (p.protocolos || []).map(function (x) {
-        return `<span class="pill-est ${x.aprobado ? "pill-ok" : "pill-neutro"}">
-          ${A.esc(x.nombre)} · mejor ${x.mejor}% · último ${x.ultimo}% (intento ${x.ultimoIntento})</span>`;
-      }).join(" ");
+      const protos = (p.protocolos || []).map((x) => `<span class="pill-est ${x.aprobado ? "pill-ok" : "pill-neutro"}">
+          ${A.esc(x.nombre)} · mejor ${x.mejor}% · último ${x.ultimo}% (intento ${x.ultimoIntento})</span>`).join(" ");
 
       return `
         <details class="admin-persona">
@@ -165,11 +479,14 @@
             <span class="ap-nombre">${A.esc(p.nombre || "(sin nombre)")}</span>
             <span class="ap-correo">${A.esc(p.correo)}</span>
             <span class="ap-datos">${A.esc(p.sede || "—")} · ${A.esc(p.cargo || "—")}</span>
-            <span class="ap-avance">${barra(p.avanceLectura)} ${Math.round(p.avanceLectura) || 0}% lectura</span>
-            <span class="ap-estado">${p.aprobados}/${p.totalProtocolos} aprobados${p.pendientes ? " · " + p.pendientes + " sin evaluar" : ""}</span>
+            <span class="ap-estado"><span class="pill-est ${est.pill}">${A.esc(est.txt)}</span></span>
             <span class="ap-tiempo">${A.esc(minutos(p.tiempoTotal))}</span>
           </summary>
           <div class="admin-detalle">
+            <p class="texto-peq texto-suave">
+              <b>${Math.round(p.avanceLectura) || 0} % lectura</b> ·
+              <b>${p.aprobados || 0}/${p.totalProtocolos || 0} aprobados</b>
+            </p>
             <p class="texto-peq texto-suave">
               ${p.dependencia ? "<b>Dónde trabaja:</b> " + A.esc(p.dependencia) + "<br>" : ""}
               ${p.profesion ? "<b>A qué se dedica:</b> " + A.esc(p.profesion) + "<br>" : ""}
@@ -191,66 +508,154 @@
             </div>
           </div>
         </details>`;
-    }).join("")
-      : '<div class="vacio">Todavía no hay participantes en el registro.</div>';
+    }).join("");
+  }
 
-    cont.innerHTML = `
-      <div class="tarjeta">
-        <div class="fila-top" style="justify-content:space-between;align-items:center">
-          <h1 style="margin:0">Panel administrativo</h1>
-          <button type="button" class="btn btn-borde" id="btnSalirAdmin">Salir</button>
-        </div>
-        ${contenido}
-        <div class="campo">
-          <label for="buscarAdmin">Buscar por nombre, correo o cargo</label>
-          <input type="search" id="buscarAdmin" placeholder="Escribe para filtrar…">
-        </div>
-      </div>
+  async function confirmarBorrado(btn) {
+    const correo = btn.getAttribute("data-borrar");
+    const original = btn.textContent;
 
-      <div class="tarjeta">
-        <h2>Participantes</h2>
-        <div id="listaAdmin">${cuerpo}</div>
-      </div>`;
-
-    document.getElementById("btnSalirAdmin").addEventListener("click", function () {
-      guardarToken(null);
-      pintarAcceso();
-    });
-
-    const buscar = document.getElementById("buscarAdmin");
-    buscar.addEventListener("input", function () {
-      const q = buscar.value.trim().toLowerCase();
-      A.$$(".admin-persona").forEach(function (el) {
-        el.style.display = !q || el.textContent.toLowerCase().includes(q) ? "" : "none";
-      });
-    });
-
-    A.$$('[data-borrar]').forEach(function (btn) {
-      btn.addEventListener("click", async function () {
-        const correo = btn.getAttribute("data-borrar");
-
-        // Confirmación en dos pasos, sin ventanas del navegador.
-        if (btn.dataset.confirmar !== "1") {
-          btn.dataset.confirmar = "1";
-          btn.textContent = "¿Confirmar? Se borrará todo su avance";
-          return;
-        }
-
-        btn.disabled = true;
-        btn.textContent = "Borrando…";
-        const r = await A.Remoto.adminBorrarProgreso(token, correo);
-        btn.disabled = false;
-
-        if (!r || r.ok !== true) {
+    if (btn.dataset.confirmar !== "1") {
+      btn.dataset.confirmar = "1";
+      btn.textContent = "¿Confirmar? Se borrará todo su avance";
+      setTimeout(function () {
+        if (btn.dataset.confirmar === "1") {
           btn.dataset.confirmar = "";
-          btn.textContent = "Borrar todo el progreso de esta persona";
-          A.aviso(explicar(r, "No se pudo borrar."), "error", 9000);
-          return;
+          btn.textContent = original;
         }
-        A.aviso("Progreso de " + correo + " borrado.", "ok");
-        cargar();
+      }, 6000);
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Borrando…";
+    const r = await A.Remoto.adminBorrarProgreso(token, correo);
+    btn.disabled = false;
+
+    if (!r || r.ok !== true) {
+      btn.dataset.confirmar = "";
+      btn.textContent = original;
+      A.aviso(explicar(r, "No se pudo borrar."), "error", 9000);
+      return;
+    }
+    A.aviso("Progreso de " + correo + " borrado.", "ok");
+    cargar();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Exportar a Excel                                                    */
+  /* ------------------------------------------------------------------ */
+  function descargarExcel() {
+    if (!window.XLSX) {
+      A.aviso("No se cargó el generador de Excel (assets/js/xlsx.js).", "error", 9000);
+      return;
+    }
+    const filas = filtrar();
+    const cuenta = document.getElementById("cuentaVisibles");
+    if (cuenta) cuenta.textContent = filas.length;
+    if (!filas.length) {
+      A.aviso("No hay participantes con esos filtros, así que no hay nada que exportar.", "error");
+      return;
+    }
+
+    /* 1) Una fila por persona. */
+    const personas = [["Correo", "Nombre", "Sede", "Cargo", "Dependencia", "Se dedica a",
+      "Teléfono", "Horario", "Observaciones", "Fecha de registro", "Estado",
+      "Avance de lectura (%)", "Protocolos aprobados", "Tiempo (segundos)", "Última actividad"]];
+
+    filas.forEach((p) => {
+      personas.push([
+        p.correo, p.nombre || "", p.sede || "", p.cargo || "", p.dependencia || "",
+        p.profesion || "", p.telefono || "", p.horario || "", p.observaciones || "",
+        p.fechaRegistro || "", estadoInfo(estadoDe(p)).txt,
+        Number(p.avanceLectura) || 0, Number(p.aprobados) || 0,
+        Number(p.tiempoTotal) || 0, fechaCorta(ultimoAvance(p)),
+      ]);
+    });
+
+    /* 2) Una fila por intento de protocolo: es la hoja donde se ven las notas. */
+    const notas = [["Correo", "Nombre", "Protocolo", "Intentos", "Mejor %", "Último %", "Aprobado"]];
+    filas.forEach((p) => {
+      (p.protocolos || []).forEach((x) => {
+        notas.push([p.correo, p.nombre || "", x.nombre, Number(x.intentos) || 0,
+          Number(x.mejor) || 0, Number(x.ultimo) || 0, x.aprobado ? "Sí" : "No"]);
       });
     });
+
+    /* 3) Una fila por módulo leído. */
+    const avance = [["Correo", "Nombre", "Módulo", "Título del módulo", "Secciones leídas",
+      "Secciones totales", "¿Completo?", "Tiempo (segundos)", "Última actividad"]];
+    filas.forEach((p) => {
+      (p.modulos || []).forEach((m) => {
+        avance.push([p.correo, p.nombre || "", m.numero, m.titulo || "",
+          Number(m.hechas) || 0, Number(m.total) || 0, m.completo ? "Sí" : "No",
+          Number(m.tiempo) || 0, fechaCorta(Date.parse(m.actualizado || "") || 0)]);
+      });
+    });
+
+    window.XLSX.descargar("participantes-campus", [
+      { nombre: "Participantes", filas: personas, anchos: [26, 24, 22, 18, 20, 18, 14, 14, 24, 16, 20, 12, 12, 12, 16] },
+      { nombre: "Notas por protocolo", filas: notas, anchos: [26, 24, 22, 10, 10, 10, 10] },
+      { nombre: "Avance por módulo", filas: avance, anchos: [26, 24, 9, 34, 14, 14, 12, 14, 16] },
+    ]);
+
+    A.aviso("Excel descargado con " + filas.length + " personas y los filtros actuales.", "ok", 6000);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Cambiar la contraseña maestra                                        */
+  /* ------------------------------------------------------------------ */
+  function seccionClave() {
+    return `
+      <div class="tarjeta">
+        <details class="admin-seguridad">
+          <summary><b>Cambiar la contraseña de este panel</b></summary>
+          <p class="texto-peq texto-suave">
+            La contraseña no está escrita en el sitio: se guarda en las propiedades del
+            proyecto de Google Apps Script. Al cambiarla desde aquí te quedarás fuera
+            de este equipo.
+          </p>
+          <form id="formClave" novalidate>
+            <div class="campo">
+              <label for="claveActual">Contraseña actual</label>
+              <input type="password" id="claveActual" autocomplete="current-password" required>
+            </div>
+            <div class="admin-filtros">
+              <div class="campo">
+                <label for="claveNueva">Nueva contraseña</label>
+                <input type="password" id="claveNueva" autocomplete="new-password" minlength="8" required>
+              </div>
+              <div class="campo">
+                <label for="claveRepetir">Repetir la nueva</label>
+                <input type="password" id="claveRepetir" autocomplete="new-password" minlength="8" required>
+              </div>
+            </div>
+            <button type="submit" class="btn">Guardar contraseña</button>
+            <p class="texto-peq texto-suave">Mínimo 8 caracteres.</p>
+          </form>
+        </details>
+      </div>`;
+  }
+
+  async function cambiarClave(ev) {
+    ev.preventDefault();
+    const btn = ev.target.querySelector('button[type="submit"]');
+    const actual = document.getElementById("claveActual").value;
+    const nueva = document.getElementById("claveNueva").value;
+    const repetir = document.getElementById("claveRepetir").value;
+
+    btn.disabled = true;
+    btn.textContent = "Guardando…";
+    const r = await A.Remoto.adminCambiarClave(token, actual, nueva, repetir);
+    btn.disabled = false;
+    btn.textContent = "Guardar contraseña";
+
+    if (!r || r.ok !== true) {
+      A.aviso(explicar(r, "No se pudo cambiar la contraseña."), "error", 9000);
+      return;
+    }
+    ev.target.reset();
+    A.aviso(r.mensaje || "Contraseña actualizada.", "ok", 8000);
   }
 
   /* Traduce la respuesta del servidor a algo que un administrador pueda

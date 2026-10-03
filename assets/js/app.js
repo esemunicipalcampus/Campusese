@@ -434,6 +434,13 @@
     adminBorrarProgreso(token, correo) {
       return this.enviar("adminBorrar", { token: token, correo: correo });
     },
+    /* La contraseña nueva viaja al servidor, que la guarda en las Propiedades
+       de secuencia de comandos. Nunca pasa por el repositorio. */
+    adminCambiarClave(token, actual, nueva, repetir) {
+      return this.enviar("adminCambiarClave", {
+        token: token, actual: actual, nueva: nueva, repetir: repetir,
+      });
+    },
 
     /**
      * Registro institucional. El código de acceso lo escribe el usuario y

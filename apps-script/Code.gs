@@ -39,11 +39,21 @@
 var CLAVE = "2k5R*PtvJ#%gSW4UE4&$#AtfcaQM$BujAmjD!iXG";
 
 /** Contraseña MAESTRA del panel administrativo (admin.html).
- *  Se compara aquí, en el servidor, nunca en el navegador.
- *  Está escrita a mano como pidió la institución, pero al vivir en un
- *  repositorio NO es secreta: cámbiala por una larga y aleatoria antes de
- *  publicar, o léela de PropertiesService (ver leerClaveAdmin). */
-var CLAVE_ADMIN = "130004708";
+ *  NO está en este archivo: vive en las Propiedades de secuencia de comandos
+ *  del proyecto (CLAVE_ADMIN), que no se publican en el repositorio.
+ *  Se cambia desde el propio panel, en "Cambiar contraseña".
+ *  Para crearla la primera vez: Configuración del proyecto → Propiedades de
+ *  secuencia de comandos → Agregar → nombre CLAVE_ADMIN → valor tu contraseña. */
+var PROPIEDAD_CLAVE_ADMIN = "CLAVE_ADMIN";
+
+/** Lee la contraseña maestra guardada en las propiedades del proyecto. */
+function leerClaveAdmin() {
+  try {
+    return String(PropertiesService.getScriptProperties().getProperty(PROPIEDAD_CLAVE_ADMIN) || "");
+  } catch (e) {
+    return "";
+  }
+}
 
 /** Sesiones de panel abiertas: token → hora de creación (en milisegundos). */
 var SESIONES_ADMIN = {};
@@ -125,11 +135,12 @@ function manejar(payload) {
   var datos = payload.datos || {};
 
   /* ---------------- Panel administrativo ----------------
-     Estas tres acciones NO exigen la clave del sitio: se validan con la
+     Estas cuatro acciones NO exigen la clave del sitio: se validan con la
      contraseña maestra y, después, con el token de sesión. */
   if (accion === "adminentrar") return adminEntrar(datos);
   if (accion === "adminprogreso") return adminProgreso(datos);
   if (accion === "adminborrar") return adminBorrar(datos);
+  if (accion === "admincambiarclave") return adminCambiarClave(datos);
 
   // Registro institucional: pide el código de acceso, no la clave del sitio.
   if (accion === "registrointerno") return listarAprobados(datos);
@@ -383,12 +394,21 @@ function listarAprobados(d) {
 /**
  * Entrada al panel. Se compara la contraseña maestra AQUÍ, en el servidor,
  * y se devuelve un token de sesión que el navegador guarda en sessionStorage.
+ * La contraseña no está en el código: se lee de las propiedades del proyecto.
  */
 function adminEntrar(d) {
-  if (!CLAVE_ADMIN || CLAVE_ADMIN === "CLAVE_SECRETA_LARGA_Y_UNICA_AQUI") {
-    return { ok: false, mensaje: "El backend no tiene contraseña maestra configurada." };
+  var guardada = leerClaveAdmin();
+  if (!guardada) {
+    return {
+      ok: false,
+      sinClave: true,
+      mensaje: "El panel todavía no tiene contraseña maestra. En Apps Script abre "
+        + "Configuración del proyecto → Propiedades de secuencia de comandos, "
+        + "agrega una propiedad llamada CLAVE_ADMIN con la contraseña que quieras "
+        + "usar, guarda y vuelve a entrar aquí."
+    };
   }
-  if (String(d.clave || "") !== CLAVE_ADMIN) {
+  if (String(d.clave || "") !== guardada) {
     return { ok: false, mensaje: "Contraseña incorrecta." };
   }
 
@@ -399,6 +419,43 @@ function adminEntrar(d) {
   guardarSesiones();
 
   return { ok: true, token: token, vence: DURACION_SESION_ADMIN_MS / 3600000 };
+}
+
+/**
+ * Cambia la contraseña maestra desde el propio panel. Pide la actual para
+ * confirmar que quien está dentro es quien dice ser, y la nueva se guarda en
+ * las propiedades del proyecto: nunca pasa por el repositorio.
+ */
+function adminCambiarClave(d) {
+  if (!revisarToken(d.token)) {
+    return { ok: false, mensaje: "La sesión expiró. Vuelve a entrar." };
+  }
+  var actual = String(d.actual || "");
+  var nueva = String(d.nueva || "");
+  var repetir = String(d.repetir || "");
+
+  if (!leerClaveAdmin()) {
+    return { ok: false, mensaje: "No hay contraseña maestra configurada en el proyecto." };
+  }
+  if (actual !== leerClaveAdmin()) {
+    return { ok: false, mensaje: "La contraseña actual no coincide." };
+  }
+  if (nueva.length < 8) {
+    return { ok: false, mensaje: "La nueva contraseña debe tener al menos 8 caracteres." };
+  }
+  if (nueva === actual) {
+    return { ok: false, mensaje: "La nueva contraseña es igual a la actual." };
+  }
+  if (nueva !== repetir) {
+    return { ok: false, mensaje: "Las dos contraseñas nuevas no coinciden." };
+  }
+
+  try {
+    PropertiesService.getScriptProperties().setProperty(PROPIEDAD_CLAVE_ADMIN, nueva);
+  } catch (e) {
+    return { ok: false, mensaje: "El servidor no dejó guardar la contraseña: " + String(e) };
+  }
+  return { ok: true, mensaje: "Contraseña actualizada. Úsala la próxima vez que entres." };
 }
 
 /** Valida el token de sesión o devuelve un mensaje de error. */

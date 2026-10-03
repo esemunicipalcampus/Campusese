@@ -728,12 +728,48 @@ table.datos td:first-child { font-weight: 600; color: var(--verde-oscuro); }
 .celda-centro { text-align: center; }
 .celda-ancho { width: 110px; }
 
+/* ---- Encabezado del panel, filtros y lista ------------------------- */
+.admin-cabecera { display: flex; flex-wrap: wrap; gap: .8rem; justify-content: space-between; align-items: flex-start; }
+.admin-cabecera-botones { display: flex; flex-wrap: wrap; gap: .5rem; }
+.enlace-volver { color: var(--verde-oscuro); text-decoration: none; font-weight: 600; }
+.enlace-volver:hover { text-decoration: underline; }
+
+.admin-filtros {
+  display: grid; gap: .7rem; margin: .4rem 0 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+}
+.admin-filtros .campo-ancho { grid-column: 1 / -1; }
+.admin-filtros .campo { margin: 0; }
+.admin-filtros label { font-size: .78rem; }
+
+.admin-lista-cabecera {
+  display: flex; flex-wrap: wrap; gap: .6rem; justify-content: space-between;
+  align-items: center; border-top: 1px solid var(--borde); padding-top: .9rem;
+}
+.admin-vistas { display: flex; gap: .4rem; flex-wrap: wrap; }
+.btn-mini { padding: .32rem .62rem; font-size: .76rem; }
+.btn-activo { background: var(--verde-oscuro); color: #fff; border-color: var(--verde-oscuro); }
+
+table.tabla-admin { font-size: .84rem; }
+table.tabla-admin th { cursor: pointer; user-select: none; white-space: nowrap; }
+table.tabla-admin th:hover { background: #14432f; }
+table.tabla-admin td:first-child { font-weight: 400; }
+.af-nombre { display: block; font-weight: 600; color: var(--verde-oscuro); }
+.af-correo { display: block; font-size: .76rem; color: var(--texto-suave); word-break: break-all; }
+
+.admin-seguridad summary { cursor: pointer; }
+.admin-seguridad form { margin-top: .9rem; }
+.admin-seguridad .admin-filtros { margin-top: .2rem; }
+
 .btn-peq { padding: .3rem .6rem; font-size: .74rem; }
 .btn-mal { border-color: #b03030; color: #b03030; }
 .btn-mal:hover { background: #b03030; color: #fff; }
 
 @media (max-width: 760px) {
   .admin-persona > summary { grid-template-columns: 1fr; gap: .2rem; }
+  .admin-cabecera { flex-direction: column; }
+  .admin-cabecera-botones { width: 100%; }
 }
 
 /* ------------------------------------------------------------------ */
