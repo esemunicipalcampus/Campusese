@@ -195,24 +195,20 @@ window.CONFIG = {
    * 'local' → todo queda en el navegador (funciona sin backend)
    * 'sheet' → además envía los registros a Google Sheets
    *
-   * PENDIENTE: está en "local" a propósito. La URL de abajo ya funciona y la
-   * contraseña del panel ya valida contra el servidor, pero el código
-   * desplegado en Apps Script es una versión vieja que falla al leer la hoja
-   * ("getSpreadsheet is not a function"). Con 'sheet' activo, el registro
-   * público se caería.
-   *
-   * Para activarlo: copia el Code.gs de este repositorio (ya corregido) en
-   * script.google.com, crea una implementación nueva y cambia aquí
-   * almacenamiento a "sheet".
+   * Está en "sheet": el Web App de abajo está desplegado con la versión
+   * corregida del backend y se verificó en vivo contra la hoja real
+   * (registro, progreso, tiempo, resultado y panel del administrador).
+   * Si algún día hay que volver a "local" para trabajar sin conexión,
+   * cambia solo esta línea.
    * ------------------------------------------------------------------ */
-  almacenamiento: "local",
+  almacenamiento: "sheet",
 
   /* URL del Web App de Google Apps Script.
    * Se obtiene en: Implementar → Nueva implementación → Aplicación web,
    * con "Quién tiene acceso: Cualquier persona".
    * Debe empezar por https://script.google.com/macros/s/ y terminar en /exec.
    * Si aparece "a/macros/dominio" adelante, está restringida y no funciona. */
-  appsScriptUrl: "https://script.google.com/macros/s/AKfycbxSgwJSK0XA6yYmgaa9KjLpU8HPijWee70R7AO1XyErzqaluhjJAJSpWwIpzojeyvO5cw/exec",
+  appsScriptUrl: "https://script.google.com/macros/s/AKfycbxWri9yYG5_pogE6biqs8MUCpt7hY1Ww4Zy6fDH-m7UzwcUFHdfoJHy2M11JipeVfqg/exec",
 
   /* Clave compartida para que solo este sitio escriba en la hoja.
    * OJO: este archivo es público, así que esta clave NO es un secreto real.

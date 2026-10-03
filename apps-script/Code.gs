@@ -169,6 +169,7 @@ function registrarParticipante(d) {
 
   // Actualiza si ya existe (evita duplicados por reintentos).
   var fila = buscarFilaPorColumna(hoja, correo, 2);
+  var ahora = new Date();
   var registro = [
     new Date(d.registro || d.fecha || ahora),
     d.correo || "",
@@ -715,13 +716,13 @@ function asegurarEncabezados(hoja, columnas) {
 
 function buscarFilaPorColumna(hoja, valor, columna) {
   var ultima = hoja.getLastRow();
-  if (ultima < 1) return 0;
-  var rango = hoja.getRange(ultima, columna, ultima, 1);
-  var valores = rango.getValues();
+  if (ultima < 2) return 0;
+  var objetivo = normalizar(valor);
+  if (!objetivo) return 0;
+  // Solo datos: la fila 1 es el encabezado y nunca debe sobrescribirse.
+  var valores = hoja.getRange(2, columna, ultima - 1, 1).getValues();
   for (var i = 0; i < valores.length; i++) {
-    if (String(valores[i][0]).trim().toUpperCase() === String(valor).trim().toUpperCase()) {
-      return ultima - valores.length + i + 1;
-    }
+    if (normalizar(valores[i][0]) === objetivo) return i + 2;
   }
   return 0;
 }
