@@ -609,11 +609,15 @@
     return `
       <div class="tarjeta">
         <details class="admin-seguridad">
-          <summary><b>Cambiar la contraseña de este panel</b></summary>
+          <summary><b>Cambiar la contraseña de este panel</b> <span class="texto-peq texto-suave">(opcional)</span></summary>
           <p class="texto-peq texto-suave">
             La contraseña no está escrita en el sitio: se guarda en las propiedades del
             proyecto de Google Apps Script. Al cambiarla desde aquí te quedarás fuera
             de este equipo.
+          </p>
+          <p class="texto-peq texto-suave">
+            Mientras no se actualice el despliegue en Apps Script, el botón te avisará
+            que falta hacerlo. Puedes seguir entrando con la contraseña de siempre.
           </p>
           <form id="formClave" novalidate>
             <div class="campo">
@@ -651,6 +655,14 @@
     btn.textContent = "Guardar contraseña";
 
     if (!r || r.ok !== true) {
+      /* El servidor devuelve "error" (no "mensaje") cuando todavía no
+         conoce esta función: pasa hasta que se actualice el despliegue
+         en Apps Script. Se avisa de eso y no del fallo en sí. */
+      if (r && r.error && !r.mensaje) {
+        A.aviso("El servidor todavía no tiene esta función. Hay que actualizar "
+          + "el despliegue en Google Apps Script y recargar esta página.", "error", 11000);
+        return;
+      }
       A.aviso(explicar(r, "No se pudo cambiar la contraseña."), "error", 9000);
       return;
     }
