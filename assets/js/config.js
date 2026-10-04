@@ -15,7 +15,7 @@ window.CONFIG = {
    * NO es un secreto: lo que protege el acceso es la lista de
    * "Orígenes de JavaScript autorizados" en Google Cloud Console.
    * ------------------------------------------------------------------ */
-  googleClientId: "366890515436-ejif168lgo63eloahh8teubf7jarudqs.apps.googleusercontent.com",
+  googleClientId: "418198580980-t0voulutr9fujbvo71nr3adprrcph5u6.apps.googleusercontent.com",
 
   /* Dominios permitidos a entrar en MODO DEMO (solo revisión previa). */
   demoDominios: ["localhost", "127.0.0.1"],
