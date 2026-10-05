@@ -115,21 +115,56 @@
    * Registra a la persona automáticamente con los datos de Google y le
    * asigna sede/cargo si todavía no los ha elegido. No pide ningún dato:
    * solo deja lista la ficha la primera vez.
+   *
+   * Además manda el correo al registro central en cuanto se entra, para que
+   * la persona aparezca en el panel aunque nunca complete el formulario.
+   * Se manda una sola vez por navegador y el servidor nunca pisa una ficha
+   * que ya existe, así que no se borra la sede ni el cargo de nadie.
    */
   function registrarDesdeGoogle(usuario) {
     if (!usuario || !usuario.correo) return null;
     const previo = leerRegistro(usuario.correo) || {};
     const sede = previo.sede || (C.sedes && C.sedes[0]) || "";
     const cargo = previo.cargo || "";
-    return guardarRegistro(usuario.correo, {
-      nombre: usuario.nombre || previo.nombre || "Participante",
+    const nombre = usuario.nombre || previo.nombre || "Participante";
+
+    const ficha = guardarRegistro(usuario.correo, {
+      nombre: nombre,
       correo: usuario.correo,
       correoVerificado: usuario.emailVerified !== false,
       foto: usuario.foto || previo.foto || "",
       sede: sede,
       cargo: cargo,
       origen: previo.origen || "google",
+      registroEnviado: previo.registroEnviado === true,
     });
+
+    /* Aviso al registro central, una sola vez por navegador. Va "suelto": si
+       el servidor no responde, la persona puede entrar igual y se reintenta
+       en la próxima entrada. */
+    if (!ficha.registroEnviado) {
+      Remoto.registrarParticipante({
+        correo: usuario.correo,
+        nombre: nombre,
+        sede: ficha.sede,
+        cargo: ficha.cargo,
+        soloSiFalta: true,
+      }).then(function (r) {
+        if (r && r.ok) {
+          /* Se vuelve a leer del almacenamiento para marcar la ficha sobre el
+             objeto que quedó guardado, no sobre una copia en memoria. */
+          const reg = obtenerRegistro();
+          if (reg[usuario.correo]) {
+            reg[usuario.correo].registroEnviado = true;
+            BD.escribir(CLAVES.registro, reg);
+          }
+        }
+      }).catch(function (e) {
+        console.warn("No se pudo avisar el registro central", e);
+      });
+    }
+
+    return ficha;
   }
 
   /** ¿La ficha ya tiene sede y cargo confirmados? */

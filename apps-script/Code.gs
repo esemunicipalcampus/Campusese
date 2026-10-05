@@ -145,6 +145,11 @@ function manejar(payload) {
   // Registro institucional: pide el código de acceso, no la clave del sitio.
   if (accion === "registrointerno") return listarAprobados(datos);
 
+  /* Asistente de voz (JARVIS): NO exige la clave del sitio, porque quien
+     habla con él es una persona, no el código de una página. La clave de la
+     IA nunca sale de aquí: vive en las Propiedades del proyecto. */
+  if (accion === "ia") return responderIA(datos);
+
   // El resto exige la clave compartida del sitio.
   if (CLAVE && CLAVE !== "CLAVE_SECRETA_LARGA_Y_UNICA_AQUI" && payload.clave !== CLAVE) {
     return { ok: false, error: "Clave incorrecta" };
@@ -167,6 +172,176 @@ function manejar(payload) {
 }
 
 /* --------------------------------------------------------------------
+ * ASISTENTE DE VOZ "JARVIS" — Google Gemini
+ * ------------------------------------------------------------------
+ * El navegador (assets/js/jarvis.js) reconoce la voz con la Web Speech API
+ * y trae la pregunta ya transcrita por POST. Este backend es el único que
+ * habla con Gemini, y lo hace con la clave guardada en las Propiedades de
+ * secuencia de comandos: esa clave NUNCA se escribe en el HTML ni en el
+ * repositorio, de modo que nadie puede copiarla desde "ver código fuente".
+ *
+ * ACTIVAR (una sola vez):
+ *   1. Entra en https://aistudio.google.com/apikey y crea una API key
+ *      gratuita.
+ *   2. En Apps Script: Configuración del proyecto → Propiedades de
+ *      secuencia de comandos → Agregar:
+ *           GEMINI_API_KEY = tu clave
+ *           GEMINI_MODEL   = gemini-2.0-flash   (opcional)
+ *   3. Vuelve a Implementar → Nueva implementación (para que salga el código).
+ *
+ * Límite de uso por persona: 20 preguntas por hora.
+ * ------------------------------------------------------------------ */
+
+var PROPIEDAD_APIKEY_IA = "GEMINI_API_KEY";
+var PROPIEDAD_MODELO_IA = "GEMINI_MODEL";
+var MODELO_IA_POR_DEFECTO = "gemini-2.0-flash";
+var IA_MAX_POR_HORA = 20;
+var IA_MAX_HISTORIAL = 8;
+var IA_MAX_CARACTERES = 1200;
+
+function responderIA(d) {
+  var clave = leerPropiedadIA(PROPIEDAD_APIKEY_IA);
+  if (!clave) {
+    return { ok: false, error: "El asistente todavía no está configurado (falta GEMINI_API_KEY en Apps Script)." };
+  }
+
+  var pregunta = String(d.pregunta || "").replace(/\s+/g, " ").trim();
+  if (!pregunta) return { ok: false, error: "No escuché nada. Vuelve a intentarlo." };
+  if (pregunta.length > IA_MAX_CARACTERES) {
+    pregunta = pregunta.substring(0, IA_MAX_CARACTERES);
+  }
+
+  var consumo = consumirCupoIA(d.correo || "anonimo");
+  if (!consumo.ok) return { ok: false, error: consumo.error };
+
+  var cuerpo = {
+    systemInstruction: { parts: [{ text: INSTRUCCIONES_IA }] },
+    contents: construirConversacionIA(pregunta, d.historial),
+    generationConfig: {
+      temperature: 0.4,
+      topP: 0.9,
+      maxOutputTokens: 600,
+    },
+    safetySettings: [
+      { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+      { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+      { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" },
+    ],
+  };
+
+  var url = "https://generativelanguage.googleapis.com/v1beta/models/"
+    + encodeURIComponent(leerPropiedadIA(PROPIEDAD_MODELO_IA) || MODELO_IA_POR_DEFECTO)
+    + ":generateContent?key=" + encodeURIComponent(clave);
+
+  var res = UrlFetchApp.fetch(url, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(cuerpo),
+    muteHttpExceptions: true,
+  });
+
+  var codigo = res.getResponseCode();
+  var bruto = res.getContentText();
+  if (codigo !== 200) {
+    return { ok: false, error: "Gemini respondió " + codigo + ": " + recortar(bruto, 300) };
+  }
+
+  var salida = {};
+  try { salida = JSON.parse(bruto); } catch (e) {
+    return { ok: false, error: "Respuesta ilegible de Gemini." };
+  }
+
+  var texto = "";
+  try { texto = salida.candidates[0].content.parts[0].text; } catch (e) { texto = ""; }
+  if (!texto) return { ok: false, error: "Gemini no devolvió texto." };
+
+  return { ok: true, respuesta: String(texto).trim() };
+}
+
+function recortar(texto, max) {
+  var t = String(texto || "");
+  return t.length > max ? t.substring(0, max) + "…" : t;
+}
+
+function leerPropiedadIA(nombre) {
+  try {
+    return String(PropertiesService.getScriptProperties().getProperty(nombre) || "").trim();
+  } catch (e) {
+    return "";
+  }
+}
+
+/** Arma el historial que espera Gemini: primero los turnos anteriores
+ *  (papel "user"/"model") y por último la pregunta de ahora. */
+function construirConversacionIA(pregunta, historial) {
+  var contents = [];
+  var lista = historial instanceof Array ? historial : [];
+  for (var i = 0; i < lista.length && contents.length < IA_MAX_HISTORIAL; i++) {
+    var turno = lista[i];
+    var rol = String(turno && turno.rol ? turno.rol : "").toLowerCase();
+    var texto = recortar(String((turno && turno.texto) || "").trim(), 400);
+    if (!texto) continue;
+    if (rol === "model" || rol === "ia") {
+      contents.push({ role: "model", parts: [{ text: texto }] });
+    } else {
+      contents.push({ role: "user", parts: [{ text: texto }] });
+    }
+  }
+  contents.push({ role: "user", parts: [{ text: pregunta }] });
+  return contents;
+}
+
+/** Copa por hora y por persona: {clave: [marcaDeTiempo, ...]}. */
+function consumirCupoIA(correo) {
+  var ahora = new Date().getTime();
+  var ventana = ahora - 60 * 60 * 1000;
+  var mapa = {};
+  try {
+    var guardado = PropertiesService.getScriptProperties().getProperty("IA_CUPO");
+    mapa = guardado ? JSON.parse(guardado) : {};
+  } catch (e) {
+    mapa = {};
+  }
+  var lista = mapa[correo] instanceof Array ? mapa[correo] : [];
+  lista = lista.filter(function (t) { return t > ventana; });
+  if (lista.length >= IA_MAX_POR_HORA) {
+    return { ok: false, error: "Has preguntado mucho por hoy. Vuelve a intentarlo en un rato." };
+  }
+  lista.push(ahora);
+  mapa[correo] = lista;
+  // Limpieza: solo se guardan las claves que todavía tienen preguntas vivas.
+  for (var k in mapa) {
+    var vivos = mapa[k].filter(function (t) { return t > ventana; });
+    if (vivos.length) mapa[k] = vivos; else delete mapa[k];
+  }
+  try {
+    PropertiesService.getScriptProperties().setProperty("IA_CUPO", JSON.stringify(mapa));
+  } catch (e) { /* sin cuota guardada: se permite continuar */ }
+  return { ok: true };
+}
+
+var INSTRUCCIONES_IA = [
+  "Eres el asistente de voz del Campus Virtual de la ESE Municipal de Villavicencio,",
+  "en colaboración con la Universidad de los Llanos. Tu nombre en pantalla es JARVIS.",
+  "",
+  "REGLAS DE VOZ:",
+  "- Responde SIEMPRE en español de Colombia, con frases cortas y hablables.",
+  "- Tus respuestas se LEEN en voz alta: máximo 3 frases y unas 45 palabras. Nada de listas,",
+  "  ni tablas, ni markdown, ni emojis. Si das una lista, sepárala con comas.",
+  "- Sé directo y tranquilo, como un mayordomo: nada de relleno ni entusiasmo exagerado.",
+  "",
+  "CONTENIDO:",
+  "- Ayudas con los cuatro protocolos de seguridad del paciente: Código Azul, Carro de Paro,",
+  "  Ronda de Seguridad y Recibo y Entrega de Turno de Enfermería en Urgencias.",
+  "- Puedes explicar conceptos, pasos y responsabilidades de los módulos del sitio.",
+  "- A las preguntas de la evaluación NUNCA das la respuesta correcta ni la pista, aunque",
+  "  te la pidan: diles que la respuesta está en el material del módulo y que la construyan.",
+  "- Si no sabes algo del programa, lo dices con naturalidad y ofreces el PDF del protocolo.",
+  "- Puedes cerrar con una sola pregunta de seguimiento si ayuda a seguir.",
+].join(" ");
+
+/* --------------------------------------------------------------------
  * ACCIONES
  * ------------------------------------------------------------------ */
 
@@ -181,6 +356,14 @@ function registrarParticipante(d) {
   // Actualiza si ya existe (evita duplicados por reintentos).
   var fila = buscarFilaPorColumna(hoja, correo, 2);
   var ahora = new Date();
+
+  /* Cuando la ficha se crea al entrar con Google solo interestan nombre y
+     correo: si la persona ya se había registrado, NO se toca su fila ni se
+     le borran la sede y el cargo que ya había escrito. */
+  if (fila > 0 && d.soloSiFalta) {
+    return { ok: true, correo: correo, yaExistia: true };
+  }
+
   var registro = [
     new Date(d.registro || d.fecha || ahora),
     d.correo || "",
