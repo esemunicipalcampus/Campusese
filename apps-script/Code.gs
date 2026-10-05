@@ -1046,3 +1046,43 @@ function htmlEscape(s) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 }
+
+/* --------------------------------------------------------------------
+ * CONFIGURACION INICIAL (se ejecuta una sola vez, desde el editor).
+ *
+ * En vez de buscar menus y propiedades a mano, ejecuta estas dos funciones
+ * una vez cada una. Quedan guardadas en las Propiedades del proyecto y el
+ * codigo no lleva ninguna clave escrita dentro.
+ * ------------------------------------------------------------------ */
+
+/** 1) Le dice al script que hoja de datos es la del curso. */
+function configurarHojaDeDatos() {
+  PropertiesService.getScriptProperties().setProperty(
+    "SPREADSHEET_ID", "15x32AHN0GeMVAwykLjFDlI_5-W3sUsFtd7RWVTKAA4E");
+  Logger.log("Hoja de datos configurada.");
+}
+
+/** 2) Fija la contrasena con la que se entra al panel administrativo.
+ *  Escribe abajo la que quieras y ejecuta esta funcion una vez. */
+function configurarClaveAdmin() {
+  var NUEVA_CLAVE = "";
+  if (!NUEVA_CLAVE) {
+    throw new Error("Edita la linea NUEVA_CLAVE de configurarClaveAdmin y ejecuta de nuevo.");
+  }
+  PropertiesService.getScriptProperties().setProperty("CLAVE_ADMIN", NUEVA_CLAVE);
+  Logger.log("Contrasena del panel guardada.");
+}
+
+/** 3) Comprueba que todo quedo bien. Deberia mostrar la hoja y la clave. */
+function comprobarConfiguracion() {
+  var id = leerPropiedadIA("SPREADSHEET_ID");
+  var clave = leerPropiedadIA("CLAVE_ADMIN");
+  Logger.log("Hoja: " + (id || "FALTA SPREADSHEET_ID"));
+  Logger.log("Clave del panel: " + (clave ? "SI esta puesta" : "FALTA CLAVE_ADMIN"));
+  try {
+    var ss = obtenerSpreadsheet();
+    Logger.log("Abre bien: " + ss.getName());
+  } catch (e) {
+    Logger.log("Problema abriendo la hoja: " + String(e));
+  }
+}
