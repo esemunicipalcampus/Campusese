@@ -905,11 +905,55 @@ function listarParticipantes() {
  * UTILIDADES
  * ------------------------------------------------------------------ */
 
+/**
+ * Abre SIEMPRE la hoja de datos del curso por su ID.
+ *
+ * Antes se buscaba por nombre y, si no aparecía, se creaba una hoja nueva.
+ * Eso era peligroso: si el script corría con otra cuenta de Google, no
+ * encontraba la hoja original y se inventaba una vacía, dejando el curso
+ * partido en dos y al panel sin datos.
+ *
+ * El ID se guarda en las Propiedades del proyecto (SPREADSHEET_ID). Si no
+ * está configurado, NO se crea nada: se avisa con un mensaje claro para que
+ * el institución la configure una sola vez.
+ */
 function obtenerSpreadsheet() {
-  var ss = buscarPorNombre(NOMBRE_SPREADSHEET);
-  if (!ss) ss = SpreadsheetApp.create(NOMBRE_SPREADSHEET);
-  crearHojas(ss);
-  return ss;
+  var id = leerPropiedadIA("SPREADSHEET_ID");
+  if (id) {
+    try {
+      var ss = SpreadsheetApp.openById(id);
+      crearHojas(ss);
+      return ss;
+    } catch (e) {
+      throw new Error(
+        "No se pudo abrir la hoja configurada (SPREADSHEET_ID=" + id + "): " + String(e)
+      );
+    }
+  }
+
+  /* Sin ID configurado solo se busca por nombre, y NUNCA se crea una hoja:
+     perder los datos reales del curso es peor que no arrancar. */
+  var porNombre = buscarPorNombre(NOMBRE_SPREADSHEET);
+  if (porNombre) {
+    PropertiesService.getScriptProperties().setProperty("SPREADSHEET_ID", porNombre.getId());
+    Logger.log("Hoja localizada por nombre, ID guardado: " + porNombre.getId());
+    crearHojas(porNombre);
+    return porNombre;
+  }
+
+  throw new Error(
+    "Falta configurar SPREADSHEET_ID. En Configuración del proyecto > Propiedades "
+    + "de secuencia de comandos, agrega SPREADSHEET_ID con el ID de la hoja "
+    + "'" + NOMBRE_SPREADSHEET + "' (abre la hoja y cópialo de la URL, entre /d/ y /edit)."
+  );
+}
+
+/** Muestra la hoja con la que está trabajando este script. Para verificar a mano. */
+function verHojaDeDatos() {
+  var ss = obtenerSpreadsheet();
+  SpreadsheetApp.getUi().alert(
+    "Hoja: " + ss.getName() + "\nID: " + ss.getId() + "\n\n" + ss.getUrl()
+  );
 }
 
 function buscarPorNombre(nombre) {
