@@ -147,7 +147,7 @@
 
     if (remoto && remoto.ok === false && remoto.motivo !== "deshabilitado") {
       A.aviso("Se guardó en este navegador, pero no llegó al registro central. "
-        + "Motivo: " + (remoto.motivo || remoto.bruto || "desconocido"), "error", 8000);
+        + "Motivo: " + (remoto.error || remoto.motivo || remoto.bruto || "desconocido"), "error", 8000);
       return;
     }
 
