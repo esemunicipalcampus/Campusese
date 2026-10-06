@@ -208,7 +208,7 @@ window.CONFIG = {
    * con "Quién tiene acceso: Cualquier persona".
    * Debe empezar por https://script.google.com/macros/s/ y terminar en /exec.
    * Si aparece "a/macros/dominio" adelante, está restringida y no funciona. */
-  appsScriptUrl: "https://script.google.com/macros/s/AKfycbzOEXyb9xOAdBVvycFgRm8Ops0ZPjs-ecFjVMC3xsIDle8qnFSL7owfThNBmdvniPKzfA/exec",
+  appsScriptUrl: "https://script.google.com/macros/s/AKfycbw7n060rRzu_1aCtQ6n2NICBgqFykcUPwjOv4_EzRhSvM_ifbRkPG4gT24YWTwEYWVEbw/exec",
 
   /* Clave compartida para que solo este sitio escriba en la hoja.
    * OJO: este archivo es público, así que esta clave NO es un secreto real.
