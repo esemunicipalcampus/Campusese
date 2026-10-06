@@ -1065,7 +1065,7 @@ function configurarHojaDeDatos() {
 /** 2) Fija la contrasena con la que se entra al panel administrativo.
  *  Escribe abajo la que quieras y ejecuta esta funcion una vez. */
 function configurarClaveAdmin() {
-  var NUEVA_CLAVE = "";
+  var NUEVA_CLAVE = "130004708";
   if (!NUEVA_CLAVE) {
     throw new Error("Edita la linea NUEVA_CLAVE de configurarClaveAdmin y ejecuta de nuevo.");
   }
