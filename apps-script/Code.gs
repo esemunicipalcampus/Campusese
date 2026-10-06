@@ -36,7 +36,7 @@
 /** Clave compartida que envía el sitio (config.js → appsScriptSecret).
  *  Evita escrituras accidentales o de bots que no revisen el código.
  *  No es un secreto fuerte: este repositorio es público. */
-var CLAVE = "2k5R*PtvJ#%gSW4UE4&$#AtfcaQM$BujAmjD!iXG";
+var CLAVE = "46ca537580a588650c3792e5e3ed743a5e8c2f67fab0a771";
 
 /** Contraseña MAESTRA del panel administrativo (admin.html).
  *  NO está en este archivo: vive en las Propiedades de secuencia de comandos

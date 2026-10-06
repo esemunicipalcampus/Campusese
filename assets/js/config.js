@@ -215,7 +215,7 @@ window.CONFIG = {
    * Sirve para evitar escrituras por accidente o de bots que no revisen el
    * código. Quien quiera bloquear de verdad el acceso debe poner la clave en
    * Apps Script (Propiedades de secuencia de comandos), no aquí. */
-  appsScriptSecret: "2k5R*PtvJ#%gSW4UE4&$#AtfcaQM$BujAmjD!iXG",
+  appsScriptSecret: "46ca537580a588650c3792e5e3ed743a5e8c2f67fab0a771",
 
   /* --------------------------------------------------------------------
    * 8) CLAVES DE ALMACENAMIENTO LOCAL
